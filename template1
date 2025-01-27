@@ -52,11 +52,14 @@
         <table class="table table-striped">
             <thead>
                 <tr>
-                    <th>Finding ID</th>
-                    <th>Finding Title</th>
+                    <th>Title</th>
+                    <th>Created</th>
+                    <th>Description</th>
                     <th>Mitigation</th>
-                    <th>Reviewed Date</th>
+                    <th>Verified</th>
+                    <th>Date</th>
                     <th>Planned Remediation Version</th>
+                    <th>Last Reviewed</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -120,14 +123,17 @@
             paginatedFindings.forEach(finding => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${finding.id}</td>
                     <td>${finding.title}</td>
+                    <td>${formatDate(finding.created)}</td>
+                    <td>${finding.description}</td>
                     <td>${finding.mitigation || 'None'}</td>
-                    <td>${formatReviewedDate(finding.reviewed_date)}</td>
+                    <td>${finding.verified ? 'Yes' : 'No'}</td>
+                    <td>${formatDate(finding.date)}</td>
                     <td>${finding.planned_remediation_version || 'No Version'}</td>
+                    <td>${formatReviewedDate(finding.reviewed_date)}</td>
                     <td>
                         <button class="btn btn-edit" onclick="window.open('https://demo.defectdojo.org/finding/${finding.id}/edit?return_url=/finding', '_blank')">Edit</button>
-                        <button class="btn btn-close" onclick="window.open('https://demo.defectdojo.org/finding/${finding.id}/close', '_blank')">Close</button>
+                        <button class="btn btn-delete" onclick="window.open('https://demo.defectdojo.org/finding/${finding.id}/delete', '_blank')">Delete</button>
                     </td>
                 `;
                 tableBody.appendChild(row);
@@ -138,6 +144,11 @@
 
             document.getElementById('prevPage').classList.toggle('disabled', currentPage === 1);
             document.getElementById('nextPage').classList.toggle('disabled', currentPage * recordsPerPage >= filteredFindings.length);
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-GB');
         }
 
         function formatReviewedDate(reviewedDate) {
