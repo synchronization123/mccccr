@@ -224,30 +224,29 @@
     }
 
     document.getElementById('prevPage').addEventListener('click', () => {
-        if (currentPage > 1) {
-            currentPage--;
+        if (currentPage > 1) {currentPage--;
             filterAndDisplayData();
         }
     });
 
     document.getElementById('nextPage').addEventListener('click', () => {
-        if (currentPage * recordsPerPage < findings.length) {
+        if (currentPage * recordsPerPage < totalFindings) {
             currentPage++;
             filterAndDisplayData();
         }
     });
 
-    document.getElementById('filterOpen').addEventListener('change', filterAndDisplayData);
-    document.getElementById('filterClosed').addEventListener('change', filterAndDisplayData);
     document.getElementById('assignedToFilter').addEventListener('change', filterAndDisplayData);
     document.getElementById('versionFilter').addEventListener('change', filterAndDisplayData);
     document.getElementById('reviewedDateFilter').addEventListener('change', filterAndDisplayData);
+    document.getElementById('filterOpen').addEventListener('change', filterAndDisplayData);
+    document.getElementById('filterClosed').addEventListener('change', filterAndDisplayData);
 
-    // Fetch findings when the page loads
+    // Refresh table every 5 minutes
+    setInterval(fetchFindings, 5 * 60 * 1000); // 5 minutes in milliseconds
+
+    // Initial fetch of data
     fetchFindings();
-
-    // Set interval to refresh the table data every 5 minutes
-    setInterval(fetchFindings, 5 * 60 * 1000); // Refresh every 5 minutes (300,000 ms)
 </script>
 
 </body>
