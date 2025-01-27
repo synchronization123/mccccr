@@ -33,7 +33,12 @@ issue_type_mapping = {
 }
 merged_df["Issue Type"] = merged_df["Issue Type"].replace(issue_type_mapping)
 
-# Step 5: Display Issue Type Summary and Get User Inputs
+# Step 5: Concatenate Issue Type and Security Column (If Needed)
+if "Security" in merged_df.columns:
+    merged_df["Issue Type"] = merged_df["Issue Type"].astype(str) + " - " + merged_df["Security"].astype(str)
+    merged_df["Issue Type"] = merged_df["Issue Type"].str.replace(" - nan", "").str.replace(" - None", "")
+
+# Step 6: Display Issue Type Summary and Get User Inputs
 issue_type_counts = merged_df["Issue Type"].value_counts()
 print("\n📌 Issue Type Summary:")
 print(issue_type_counts.to_string())
@@ -56,23 +61,23 @@ for issue_type, count in issue_type_counts.items():
 
     merged_df.loc[merged_df["Issue Type"] == issue_type, "Assigned To"] = user_assignments_list
 
-# Step 6: Add Current Date to Date and Assigned On Columns
+# Step 7: Add Current Date to Date and Assigned On Columns
 merged_df["Date"] = current_date_str
 merged_df["Assigned On"] = current_date_str
 
-# Step 7: Split into Develop and Non-Develop Sheets
+# Step 8: Split into Develop and Non-Develop Sheets
 develop_mask = merged_df["Version"].str.contains("develop", case=False, na=False)
 develop_df = merged_df[develop_mask]
 non_develop_df = merged_df[~develop_mask & merged_df["Version"].notna()]  # Exclude blank Versions
 
-# Step 8: Save Output Files
+# Step 9: Save Output Files
 develop_file = f"{output_dir}/Develop_jiras_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
 non_develop_file = f"{output_dir}/Non_Develop_jiras_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
 
 develop_df.to_excel(develop_file, index=False)
 non_develop_df.to_excel(non_develop_file, index=False)
 
-# Step 9: Display Summary by Version and Assigned To
+# Step 10: Display Summary by Version and Assigned To
 version_summary = merged_df.groupby("Version")["Issue Key"].count().reset_index()
 version_summary.columns = ["Version", "Total Issues"]
 
@@ -92,7 +97,7 @@ total_version_count = version_summary["Total Issues"].sum()
 print(f"\n📌 Total Issue Type Count: {total_issue_type_count}")
 print(f"📌 Total Version-wise Issue Key Count: {total_version_count}")
 
-# Step 10: Move Old Files to Backup and Delete
+# Step 11: Move Old Files to Backup and Delete
 for f in all_files:
     if f not in [develop_file, non_develop_file]:  # Preserve output files
         backup_path = os.path.join(backup_dir, f)
