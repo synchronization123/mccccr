@@ -3,15 +3,17 @@ import shutil
 import pandas as pd
 from datetime import datetime
 
-# Define paths
-output_folder = "data/output"
-backup_folder = "backup"
-os.makedirs(output_folder, exist_ok=True)
-os.makedirs(backup_folder, exist_ok=True)
-
 # Get today's date in required format
-today_date = datetime.today().strftime("%d-%b-%Y")
-file_date = datetime.today().strftime("%Y-%m-%d")
+today_date = datetime.today().strftime("%d-%b-%Y")  # Example: 27-Jan-2025
+file_date = datetime.today().strftime("%Y-%m-%d")   # Example: 2025-01-27
+
+# Define paths
+backup_folder = f"backup/{today_date}"
+output_folder = f"output/{today_date}"
+
+# Create date-wise directories if not exist
+os.makedirs(backup_folder, exist_ok=True)
+os.makedirs(output_folder, exist_ok=True)
 
 # Step 1: Move Existing Excel Files to Backup Before Processing
 files = [f for f in os.listdir() if f.endswith(".xlsx") and not f.startswith("~$")]
@@ -26,7 +28,7 @@ for file in files:
 
     shutil.move(src_path, dest_path)  # Move file to backup
 
-print(f"✅ Moved {len(files)} files to backup before processing.")
+print(f"✅ Moved {len(files)} files to backup folder: {backup_folder}")
 
 # Step 2: Merge All Excel Files from Backup
 backup_files = [os.path.join(backup_folder, f) for f in os.listdir(backup_folder) if f.endswith(".xlsx")]
@@ -63,9 +65,9 @@ concatenated_file = os.path.join(output_folder, "concatenated.xlsx")
 merged_df.to_excel(concatenated_file, index=False)
 
 # Step 4: Display Summary by Issue Type
-issue_type_summary = merged_df["Issue Types"].value_counts().reset_index()
-issue_type_summary.columns = ["Issue Type", "Count"]
-print("\nSummary by Issue Type:")
+issue_type_summary = merged_df.groupby("Issue Types")["Issue Key"].count().reset_index()
+issue_type_summary.columns = ["Issue Type", "Total Issues"]
+print("\n📌 Summary by Issue Type:")
 print(issue_type_summary.to_string(index=False))
 
 # Step 5: Get User Input for Assignment
@@ -139,12 +141,13 @@ os.remove(concatenated_file)
 
 # Step 10: Display Summary by Version and Assigned To
 print("\n📌 Summary by Version (Grouped by Issue Type):")
-version_summary = merged_df.groupby(['Version', 'Issue Types']).size().reset_index(name='Count')
+version_summary = merged_df.groupby(['Version', 'Issue Types'])["Issue Key"].count().reset_index()
+version_summary.columns = ["Version", "Issue Type", "Total Issues"]
 print(version_summary.to_string(index=False))
 
 print("\n📌 Summary by Assigned To:")
-assigned_to_summary = merged_df["Assigned To"].value_counts().reset_index()
-assigned_to_summary.columns = ["Assigned To", "Count"]
+assigned_to_summary = merged_df.groupby("Assigned To")["Issue Key"].count().reset_index()
+assigned_to_summary.columns = ["Assigned To", "Total Issues"]
 print(assigned_to_summary.to_string(index=False))
 
 print("\n✅ Processing complete. Files saved:")
