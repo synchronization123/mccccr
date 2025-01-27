@@ -17,10 +17,6 @@ all_files = [f for f in os.listdir() if f.endswith(".xlsx")]
 df_list = [pd.read_excel(f) for f in all_files]
 merged_df = pd.concat(df_list, ignore_index=True)
 
-# Save Merged Data
-merged_file = f"{output_dir}/Merged.xlsx"
-merged_df.to_excel(merged_file, index=False)
-
 # Step 3: Ensure required columns exist
 required_columns = [
     "Date", "Issue Key", "Issue Type", "Version", "Assigned To",
@@ -109,7 +105,7 @@ print(f"📌 Total Version-wise Issue Key Count: {total_version_count}")
 
 # Step 11: Move Old Files to Backup and Delete
 for f in all_files:
-    if f not in [develop_file, non_develop_file, concatenated_file, merged_file]:  # Preserve output files
+    if f not in [develop_file, non_develop_file, concatenated_file]:  # Preserve output files
         backup_path = os.path.join(backup_dir, f)
         if os.path.exists(backup_path):  # If already exists, rename with timestamp
             new_name = f"{os.path.splitext(f)[0]}_{datetime.now().strftime('%H%M%S')}.xlsx"
