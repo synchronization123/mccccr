@@ -17,29 +17,39 @@ all_files = [f for f in os.listdir() if f.endswith(".xlsx")]
 df_list = [pd.read_excel(f) for f in all_files]
 merged_df = pd.concat(df_list, ignore_index=True)
 
+# Save Merged Data
+merged_file = f"{output_dir}/Merged.xlsx"
+merged_df.to_excel(merged_file, index=False)
+
 # Step 3: Ensure required columns exist
 required_columns = [
     "Date", "Issue Key", "Issue Type", "Version", "Assigned To",
-    "Status", "Assigned On", "Analyst Comments", "Mentor Review", "Feedback"
+    "Status", "Assigned On", "Analyst Comments", "Mentor Review", "Feedback", "Security"
 ]
 merged_df = merged_df.reindex(columns=required_columns, fill_value="")
 
-# Step 4: Standardize Issue Type Naming
+# Step 4: Concatenate Issue Key and Security Columns
+merged_df["Issue Key"] = merged_df["Issue Key"].astype(str) + " - " + merged_df["Security"].astype(str)
+merged_df["Issue Key"] = merged_df["Issue Key"].str.replace(" - nan", "").str.replace(" - None", "")
+
+# Drop Security column after concatenation
+concatenated_df = merged_df.drop(columns=["Security"], errors="ignore")
+
+# Save Concatenated Data
+concatenated_file = f"{output_dir}/Concatenate.xlsx"
+concatenated_df.to_excel(concatenated_file, index=False)
+
+# Step 5: Standardize Issue Type Naming
 issue_type_mapping = {
     "Bug": "Functional Bug",
     "Story": "Epic Story",
     "Bug Security": "Security",
     "Improvement-Technical Security": "Security"
 }
-merged_df["Issue Type"] = merged_df["Issue Type"].replace(issue_type_mapping)
-
-# Step 5: Concatenate Issue Type and Security Column (If Needed)
-if "Security" in merged_df.columns:
-    merged_df["Issue Type"] = merged_df["Issue Type"].astype(str) + " - " + merged_df["Security"].astype(str)
-    merged_df["Issue Type"] = merged_df["Issue Type"].str.replace(" - nan", "").str.replace(" - None", "")
+concatenated_df["Issue Type"] = concatenated_df["Issue Type"].replace(issue_type_mapping)
 
 # Step 6: Display Issue Type Summary and Get User Inputs
-issue_type_counts = merged_df["Issue Type"].value_counts()
+issue_type_counts = concatenated_df["Issue Type"].value_counts()
 print("\n📌 Issue Type Summary:")
 print(issue_type_counts.to_string())
 
@@ -55,20 +65,20 @@ for issue_type, count in issue_type_counts.items():
 
     # Assign sequentially (first user gets first 30, then next user, and so on)
     user_assignments_list = []
-    for idx, issue in enumerate(merged_df[merged_df["Issue Type"] == issue_type].index):
+    for idx, issue in enumerate(concatenated_df[concatenated_df["Issue Type"] == issue_type].index):
         assigned_user = user_list[idx // 30 % len(user_list)]  # Sequential distribution
         user_assignments_list.append(assigned_user)
 
-    merged_df.loc[merged_df["Issue Type"] == issue_type, "Assigned To"] = user_assignments_list
+    concatenated_df.loc[concatenated_df["Issue Type"] == issue_type, "Assigned To"] = user_assignments_list
 
 # Step 7: Add Current Date to Date and Assigned On Columns
-merged_df["Date"] = current_date_str
-merged_df["Assigned On"] = current_date_str
+concatenated_df["Date"] = current_date_str
+concatenated_df["Assigned On"] = current_date_str
 
 # Step 8: Split into Develop and Non-Develop Sheets
-develop_mask = merged_df["Version"].str.contains("develop", case=False, na=False)
-develop_df = merged_df[develop_mask]
-non_develop_df = merged_df[~develop_mask & merged_df["Version"].notna()]  # Exclude blank Versions
+develop_mask = concatenated_df["Version"].str.contains("develop", case=False, na=False)
+develop_df = concatenated_df[develop_mask]
+non_develop_df = concatenated_df[~develop_mask & concatenated_df["Version"].notna()]  # Exclude blank Versions
 
 # Step 9: Save Output Files
 develop_file = f"{output_dir}/Develop_jiras_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
@@ -78,10 +88,10 @@ develop_df.to_excel(develop_file, index=False)
 non_develop_df.to_excel(non_develop_file, index=False)
 
 # Step 10: Display Summary by Version and Assigned To
-version_summary = merged_df.groupby("Version")["Issue Key"].count().reset_index()
+version_summary = concatenated_df.groupby("Version")["Issue Key"].count().reset_index()
 version_summary.columns = ["Version", "Total Issues"]
 
-assigned_summary = merged_df.groupby("Assigned To")["Issue Key"].count().reset_index()
+assigned_summary = concatenated_df.groupby("Assigned To")["Issue Key"].count().reset_index()
 assigned_summary.columns = ["Assigned To", "Total Issues"]
 
 print("\n📌 Version-wise Summary:")
@@ -99,7 +109,7 @@ print(f"📌 Total Version-wise Issue Key Count: {total_version_count}")
 
 # Step 11: Move Old Files to Backup and Delete
 for f in all_files:
-    if f not in [develop_file, non_develop_file]:  # Preserve output files
+    if f not in [develop_file, non_develop_file, concatenated_file, merged_file]:  # Preserve output files
         backup_path = os.path.join(backup_dir, f)
         if os.path.exists(backup_path):  # If already exists, rename with timestamp
             new_name = f"{os.path.splitext(f)[0]}_{datetime.now().strftime('%H%M%S')}.xlsx"
