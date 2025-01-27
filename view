@@ -23,6 +23,16 @@
             text-align: center;
             color: #333;
         }
+        .filter-container {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        select {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
         .chart-container {
             display: flex;
             justify-content: space-between;
@@ -45,6 +55,15 @@
 <body>
     <div class="container">
         <h1>Productivity Dashboard</h1>
+        
+        <div class="filter-container">
+            <label for="versionSelect">Select Planned Remediation Version: </label>
+            <select id="versionSelect">
+                <option value="all">All Versions</option>
+                <!-- Dynamic version options will be added here -->
+            </select>
+        </div>
+
         <div class="chart-container">
             <div class="chart-box">
                 <h2>Assigned Tasks and Verified Tasks</h2>
@@ -58,18 +77,25 @@
     </div>
 
     <script>
-        async function fetchData() {
-            const url = 'https://dojo.xdm.com/api/v2/findings/?limit=4747484848&offset=0&reporter=8';
+        const apiUrl = 'https://dojo.xdm.com/api/v2/findings/?limit=4747484848&offset=0&reporter=8';
+        
+        // Function to fetch data from API
+        async function fetchData(version = 'all') {
+            let url = apiUrl;
+            if (version !== 'all') {
+                url += `&planned_remediation_version=${version}`;
+            }
             const response = await fetch(url);
             const data = await response.json();
-
             return data.results;
         }
 
-        async function processData() {
-            const data = await fetchData();
+        // Function to process the fetched data
+        async function processData(version = 'all') {
+            const data = await fetchData(version);
             const userStats = {};
             const verifiedStats = {};
+            const plannedVersions = new Set();
 
             // Processing the data
             data.forEach(item => {
@@ -77,6 +103,7 @@
                 const verified = item.verified;
                 const lastReviewed = new Date(item.last_reviewed);
                 const yearMonth = `${lastReviewed.getFullYear()}-${lastReviewed.getMonth() + 1}`;
+                const plannedRemediationVersion = item.planned_remediation_version;
 
                 // Track the number of changes per assigned person
                 if (!userStats[assignedTo]) {
@@ -91,77 +118,101 @@
                     }
                     verifiedStats[assignedTo]++;
                 }
+
+                // Track all unique planned remediation versions
+                if (plannedRemediationVersion) {
+                    plannedVersions.add(plannedRemediationVersion);
+                }
             });
 
-            return { userStats, verifiedStats };
+            return { userStats, verifiedStats, plannedVersions };
         }
 
-        function renderCharts() {
-            processData().then(({ userStats, verifiedStats }) => {
-                const barLabels = Object.keys(userStats);
-                const barData = barLabels.map(user => userStats[user]);
-                const verifiedData = barLabels.map(user => verifiedStats[user] || 0);
+        // Function to render charts
+        async function renderCharts(version = 'all') {
+            const { userStats, verifiedStats, plannedVersions } = await processData(version);
 
-                const barChartCtx = document.getElementById('barChart').getContext('2d');
-                new Chart(barChartCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: barLabels,
-                        datasets: [
-                            {
-                                label: 'Total Tasks',
-                                data: barData,
-                                backgroundColor: '#42A5F5',
-                            },
-                            {
-                                label: 'Verified Tasks',
-                                data: verifiedData,
-                                backgroundColor: '#66BB6A',
-                            },
-                        ],
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                position: 'top',
-                            },
-                        },
-                        scales: {
-                            x: {
-                                beginAtZero: true,
-                            },
-                        },
-                    },
-                });
+            const barLabels = Object.keys(userStats);
+            const barData = barLabels.map(user => userStats[user]);
+            const verifiedData = barLabels.map(user => verifiedStats[user] || 0);
 
-                // Pie chart for user distribution
-                const pieChartCtx = document.getElementById('pieChart').getContext('2d');
-                const pieData = barLabels.map(user => userStats[user]);
-                new Chart(pieChartCtx, {
-                    type: 'pie',
-                    data: {
-                        labels: barLabels,
-                        datasets: [
-                            {
-                                label: 'User Task Distribution',
-                                data: pieData,
-                                backgroundColor: ['#FF5733', '#FFBD33', '#33FF57', '#33A0FF', '#A833FF'],
-                            },
-                        ],
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                position: 'top',
-                            },
+            // Render Bar Chart
+            const barChartCtx = document.getElementById('barChart').getContext('2d');
+            new Chart(barChartCtx, {
+                type: 'bar',
+                data: {
+                    labels: barLabels,
+                    datasets: [
+                        {
+                            label: 'Total Tasks',
+                            data: barData,
+                            backgroundColor: '#42A5F5',
+                        },
+                        {
+                            label: 'Verified Tasks',
+                            data: verifiedData,
+                            backgroundColor: '#66BB6A',
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
                         },
                     },
-                });
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                        },
+                    },
+                },
+            });
+
+            // Render Pie Chart
+            const pieChartCtx = document.getElementById('pieChart').getContext('2d');
+            const pieData = barLabels.map(user => userStats[user]);
+            new Chart(pieChartCtx, {
+                type: 'pie',
+                data: {
+                    labels: barLabels,
+                    datasets: [
+                        {
+                            label: 'User Task Distribution',
+                            data: pieData,
+                            backgroundColor: ['#FF5733', '#FFBD33', '#33FF57', '#33A0FF', '#A833FF'],
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                    },
+                },
+            });
+
+            // Populate version dropdown
+            const versionSelect = document.getElementById('versionSelect');
+            versionSelect.innerHTML = '<option value="all">All Versions</option>';
+            plannedVersions.forEach(version => {
+                const option = document.createElement('option');
+                option.value = version;
+                option.textContent = version;
+                versionSelect.appendChild(option);
             });
         }
 
+        // Event listener for version dropdown change
+        document.getElementById('versionSelect').addEventListener('change', (event) => {
+            const selectedVersion = event.target.value;
+            renderCharts(selectedVersion);
+        });
+
+        // Initial chart render
         renderCharts();
     </script>
 </body>
