@@ -33,12 +33,21 @@
 
     <div class="mb-3">
         <label for="assignedToFilter">Assigned To:</label>
-        <input type="text" id="assignedToFilter" class="form-control" placeholder="Filter by assignee">
+        <select id="assignedToFilter" class="form-select">
+            <option value="">Select Assignee</option>
+        </select>
     </div>
 
     <div class="mb-3">
         <label for="versionFilter">Version:</label>
-        <input type="text" id="versionFilter" class="form-control" placeholder="Filter by version">
+        <select id="versionFilter" class="form-select">
+            <option value="">Select Version</option>
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label for="reviewedDateFilter">Reviewed Date:</label>
+        <input type="date" id="reviewedDateFilter" class="form-control">
     </div>
 
     <div id="loadingMessage" style="display:none;">Loading data...</div>
@@ -116,6 +125,7 @@
         const filterClosed = document.getElementById('filterClosed').checked;
         const assignedToFilter = document.getElementById('assignedToFilter').value.toLowerCase();
         const versionFilter = document.getElementById('versionFilter').value.toLowerCase();
+        const reviewedDateFilter = document.getElementById('reviewedDateFilter').value;
 
         let filteredFindings = findings.filter(finding => {
             const isPending = !finding.is_mitigated; // Open (Pending) status
@@ -124,8 +134,9 @@
             let statusMatch = (filterOpen && isPending && !isVerified) || (filterClosed && isVerified);
             let assignedMatch = assignedToFilter === "" || finding.mitigation.toLowerCase().includes(assignedToFilter);
             let versionMatch = versionFilter === "" || finding.planned_remediation_version.toLowerCase().includes(versionFilter);
-            
-            return statusMatch && assignedMatch && versionMatch;
+            let reviewedDateMatch = reviewedDateFilter === "" || formatDate(finding.Last_reviewed_by_changed) === reviewedDateFilter;
+
+            return statusMatch && assignedMatch && versionMatch && reviewedDateMatch;
         });
 
         updateVersionCounts(filteredFindings);
@@ -189,6 +200,8 @@
     function populateAssignedToDropdown() {
         const assignedToFilter = document.getElementById('assignedToFilter');
         const uniqueAssignees = [...new Set(findings.map(f => f.mitigation))];
+        
+        assignedToFilter.innerHTML = '<option value="">Select Assignee</option>'; // Clear previous options
         uniqueAssignees.forEach(assignee => {
             const option = document.createElement('option');
             option.value = assignee;
@@ -200,6 +213,8 @@
     function populateVersionDropdown() {
         const versionFilter = document.getElementById('versionFilter');
         const uniqueVersions = [...new Set(findings.map(f => f.planned_remediation_version))];
+        
+        versionFilter.innerHTML = '<option value="">Select Version</option>'; // Clear previous options
         uniqueVersions.forEach(version => {
             const option = document.createElement('option');
             option.value = version;
@@ -226,8 +241,13 @@
     document.getElementById('filterClosed').addEventListener('change', filterAndDisplayData);
     document.getElementById('assignedToFilter').addEventListener('change', filterAndDisplayData);
     document.getElementById('versionFilter').addEventListener('change', filterAndDisplayData);
+    document.getElementById('reviewedDateFilter').addEventListener('change', filterAndDisplayData);
 
+    // Fetch findings when the page loads
     fetchFindings();
+
+    // Set interval to refresh the table data every 5 minutes
+    setInterval(fetchFindings, 5 * 60 * 1000); // Refresh every 5 minutes (300,000 ms)
 </script>
 
 </body>
