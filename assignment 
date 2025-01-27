@@ -1,156 +1,106 @@
 import os
-import shutil
 import pandas as pd
+import shutil
 from datetime import datetime
 
-# Get today's date in required format
-today_date = datetime.today().strftime("%d-%b-%Y")  # Example: 27-Jan-2025
-file_date = datetime.today().strftime("%Y-%m-%d")   # Example: 2025-01-27
+# Step 1: Define Paths
+current_date_str = datetime.now().strftime("%d-%b-%Y")  # Format: 27-Jan-2025
+output_dir = f"data/output/{current_date_str}"
+backup_dir = f"backup/{current_date_str}"
 
-# Define paths
-backup_folder = f"backup/{today_date}"
-output_folder = f"output/{today_date}"
+# Ensure directories exist
+os.makedirs(output_dir, exist_ok=True)
+os.makedirs(backup_dir, exist_ok=True)
 
-# Create date-wise directories if not exist
-os.makedirs(backup_folder, exist_ok=True)
-os.makedirs(output_folder, exist_ok=True)
-
-# Step 1: Move Existing Excel Files to Backup Before Processing
-files = [f for f in os.listdir() if f.endswith(".xlsx") and not f.startswith("~$")]
-
-for file in files:
-    src_path = os.path.join(file)
-    dest_path = os.path.join(backup_folder, file)
-
-    # If file exists in backup, replace it
-    if os.path.exists(dest_path):
-        os.remove(dest_path)  # Delete old version in backup
-
-    shutil.move(src_path, dest_path)  # Move file to backup
-
-print(f"✅ Moved {len(files)} files to backup folder: {backup_folder}")
-
-# Step 2: Merge All Excel Files from Backup
-backup_files = [os.path.join(backup_folder, f) for f in os.listdir(backup_folder) if f.endswith(".xlsx")]
-df_list = [pd.read_excel(f, dtype=str) for f in backup_files]
+# Step 2: Merge all `.xlsx` files in the current directory
+all_files = [f for f in os.listdir() if f.endswith(".xlsx")]
+df_list = [pd.read_excel(f) for f in all_files]
 merged_df = pd.concat(df_list, ignore_index=True)
 
-# Save Merged File
-merged_file = os.path.join(output_folder, "merged.xlsx")
-merged_df.to_excel(merged_file, index=False)
+# Step 3: Ensure required columns exist
+required_columns = [
+    "Date", "Issue Key", "Issue Type", "Version", "Assigned To",
+    "Status", "Assigned On", "Analyst Comments", "Mentor Review", "Feedback"
+]
+merged_df = merged_df.reindex(columns=required_columns, fill_value="")
 
-# Ensure required columns exist
-required_columns = ["Date", "Issue Key", "Issue Type", "Version", "Assigned To", "Status"]
-for col in required_columns:
-    if col not in merged_df.columns:
-        merged_df[col] = ""
+# Step 4: Update Issue Type based on Security column
+if "Security" in merged_df.columns:
+    merged_df["Issue Type"] = merged_df.apply(
+        lambda row: "Security" if "Security" in str(row["Security"]) else row["Issue Type"], axis=1
+    )
+    merged_df.drop(columns=["Security"], inplace=True)
 
-# Step 3: Concatenate Issue Type & Security, then clean up Issue Types
-merged_df["Issue Types"] = merged_df["Issue Type"].fillna("") + " " + merged_df["Security"].fillna("")
-merged_df["Issue Types"] = merged_df["Issue Types"].str.strip()
-
-# Rename issue types
-merged_df["Issue Types"] = merged_df["Issue Types"].replace({
+# Step 5: Standardize Issue Type Naming
+issue_type_mapping = {
+    "Bug": "Functional Bug",
+    "Story": "Epic Story",
     "Bug Security": "Security",
-    "Improvement-Technical Security": "Security",
-    "Bug": "Functional bug",
-    "Story": "Epic story"
-})
+    "Improvement-Technical Security": "Security"
+}
+merged_df["Issue Type"] = merged_df["Issue Type"].replace(issue_type_mapping)
 
-# Drop old columns
-merged_df.drop(columns=["Issue Type", "Security"], inplace=True)
+# Step 6: Prompt for user assignment
+issue_type_counts = merged_df["Issue Type"].value_counts()
+print("\n📌 Issue Type Summary:")
+print(issue_type_counts.to_string())
 
-# Save Concatenated File
-concatenated_file = os.path.join(output_folder, "concatenated.xlsx")
-merged_df.to_excel(concatenated_file, index=False)
-
-# Step 4: Display Summary by Issue Type
-issue_type_summary = merged_df.groupby("Issue Types")["Issue Key"].count().reset_index()
-issue_type_summary.columns = ["Issue Type", "Total Issues"]
-print("\n📌 Summary by Issue Type:")
-print(issue_type_summary.to_string(index=False))
-
-# Step 5: Get User Input for Assignment
 user_assignments = {}
-for issue_type, count in issue_type_summary.values:
-    required_users = (count + 29) // 30
-    print(f"\nFor issue type '{issue_type}', we need around {required_users} user(s) for {count} issues.")
-    users_input = input(f"Enter comma-separated users for issue type '{issue_type}' (up to {required_users} users): ")
-    users = [u.strip() for u in users_input.split(",") if u.strip()]
+for issue_type, count in issue_type_counts.items():
+    suggested_users = max(1, count // 30)
+    user_input = input(f"\nEnter {suggested_users} comma-separated users for '{issue_type}': ").strip()
+    user_list = [u.strip() for u in user_input.split(",") if u.strip()]
+    if not user_list:
+        continue
 
-    if not users:
-        print(f"⚠️ Warning: No users entered for '{issue_type}'. These issues will remain unassigned.")
-    
-    user_assignments[issue_type] = users
+    user_assignments[issue_type] = user_list
+    merged_df.loc[merged_df["Issue Type"] == issue_type, "Assigned To"] = pd.Series(
+        user_list * (count // len(user_list)) + user_list[:count % len(user_list)]
+    )
 
-# Step 6: Assign Issues Sequentially
-merged_df["Assigned To"] = ""
+# Step 7: Add Current Date to Date and Assigned On Columns
+merged_df["Date"] = current_date_str
+merged_df["Assigned On"] = current_date_str
 
-for issue_type, users in user_assignments.items():
-    if not users:
-        continue  # Skip if no users entered for this issue type
+# Step 8: Split into Develop and Non-Develop Sheets
+develop_mask = merged_df["Version"].str.contains("develop", case=False, na=False)
+develop_df = merged_df[develop_mask]
+non_develop_df = merged_df[~develop_mask & merged_df["Version"].notna()]  # Exclude blank Versions
 
-    issue_mask = merged_df["Issue Types"] == issue_type
-    issue_indices = merged_df[issue_mask].index
-    num_issues = len(issue_indices)
-    
-    # Determine issues per user
-    num_users = len(users)
-    issues_per_user = (num_issues + num_users - 1) // num_users  
-
-    # Assign sequentially
-    assigned_users = []
-    user_index = 0
-
-    for i, idx in enumerate(issue_indices):
-        assigned_users.append(users[user_index])
-        if (i + 1) % issues_per_user == 0 and user_index < num_users - 1:
-            user_index += 1
-
-    merged_df.loc[issue_indices, "Assigned To"] = assigned_users
-
-# Step 7: Split into Develop & Non-Develop
-merged_df["Version"] = merged_df["Version"].fillna("")
-develop_df = merged_df[merged_df["Version"].str.contains("develop", case=False, na=False)].copy()
-non_develop_df = merged_df[~merged_df["Version"].str.contains("develop", case=False, na=False)].copy()
-
-# Remove blank Version rows from non-develop
-non_develop_df = non_develop_df[non_develop_df["Version"].str.strip() != ""]
-
-# Arrange Columns
-column_order = ["Date", "Issue Key", "Issue Types", "Version", "Assigned To", "Status"]
-develop_df = develop_df[column_order]
-non_develop_df = non_develop_df[column_order]
-
-# Fill missing dates
-develop_df["Date"] = today_date
-develop_df["Assigned On"] = today_date
-non_develop_df["Date"] = today_date
-non_develop_df["Assigned On"] = today_date
-
-# Step 8: Save Final Files
-develop_file = os.path.join(output_folder, f"Develop_jiras_{file_date}.xlsx")
-non_develop_file = os.path.join(output_folder, f"Non_Develop_jiras_{file_date}.xlsx")
+# Step 9: Save Output Files
+develop_file = f"{output_dir}/Develop_jiras_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
+non_develop_file = f"{output_dir}/Non_Develop_jiras_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
 
 develop_df.to_excel(develop_file, index=False)
 non_develop_df.to_excel(non_develop_file, index=False)
 
-# Step 9: Cleanup - Delete Intermediate Files
-os.remove(merged_file)
-os.remove(concatenated_file)
-
 # Step 10: Display Summary by Version and Assigned To
-print("\n📌 Summary by Version (Grouped by Issue Type):")
-version_summary = merged_df.groupby(['Version', 'Issue Types'])["Issue Key"].count().reset_index()
-version_summary.columns = ["Version", "Issue Type", "Total Issues"]
+version_summary = merged_df.groupby("Version")["Issue Key"].count().reset_index()
+version_summary.columns = ["Version", "Total Issues"]
+
+assigned_summary = merged_df.groupby("Assigned To")["Issue Key"].count().reset_index()
+assigned_summary.columns = ["Assigned To", "Total Issues"]
+
+print("\n📌 Version-wise Summary:")
 print(version_summary.to_string(index=False))
 
-print("\n📌 Summary by Assigned To:")
-assigned_to_summary = merged_df.groupby("Assigned To")["Issue Key"].count().reset_index()
-assigned_to_summary.columns = ["Assigned To", "Total Issues"]
-print(assigned_to_summary.to_string(index=False))
+print("\n📌 Assigned To Summary:")
+print(assigned_summary.to_string(index=False))
 
-print("\n✅ Processing complete. Files saved:")
-print(f"- {develop_file}")
-print(f"- {non_develop_file}")
-print(f"- Backup files stored in '{backup_folder}'")
+# Calculate Overall Totals
+total_issue_type_count = issue_type_counts.sum()
+total_version_count = version_summary["Total Issues"].sum()
+
+print(f"\n📌 Total Issue Type Count: {total_issue_type_count}")
+print(f"📌 Total Version-wise Issue Key Count: {total_version_count}")
+
+# Step 11: Move Old Files to Backup and Delete
+for f in all_files:
+    if f not in [develop_file, non_develop_file]:  # Preserve output files
+        backup_path = os.path.join(backup_dir, f)
+        if os.path.exists(backup_path):  # If already exists, rename with timestamp
+            new_name = f"{os.path.splitext(f)[0]}_{datetime.now().strftime('%H%M%S')}.xlsx"
+            backup_path = os.path.join(backup_dir, new_name)
+        shutil.move(f, backup_path)
+
+print("\n✅ Process Completed Successfully!")
