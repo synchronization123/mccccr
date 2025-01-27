@@ -24,11 +24,11 @@ required_columns = [
 ]
 merged_df = merged_df.reindex(columns=required_columns, fill_value="")
 
-# Step 4: Concatenate Issue Key and Security Columns
-merged_df["Issue Key"] = merged_df["Issue Key"].astype(str) + " - " + merged_df["Security"].astype(str)
-merged_df["Issue Key"] = merged_df["Issue Key"].str.replace(" - nan", "").str.replace(" - None", "")
+# Step 4: Concatenate Issue Type and Security Columns
+merged_df["Issue Type"] = merged_df["Issue Type"].astype(str) + " " + merged_df["Security"].astype(str)
+merged_df["Issue Type"] = merged_df["Issue Type"].str.replace(" nan", "").str.replace(" None", "")  # Clean up unwanted strings
 
-# Drop Security column after concatenation
+# Drop the Security column after concatenation
 concatenated_df = merged_df.drop(columns=["Security"], errors="ignore")
 
 # Save Concatenated Data
