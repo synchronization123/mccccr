@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Productivity Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/chart.js" rel="stylesheet" type="text/css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7fc;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .chart-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        .chart-box {
+            width: 45%;
+            height: 400px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Productivity Dashboard</h1>
+        <div class="chart-container">
+            <div class="chart-box">
+                <h2>Assigned Tasks and Verified Tasks</h2>
+                <canvas id="barChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h2>User Distribution (Pie Chart)</h2>
+                <canvas id="pieChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchData() {
+            const url = 'https://dojo.xdm.com/api/v2/findings/?limit=4747484848&offset=0&reporter=8';
+            const response = await fetch(url);
+            const data = await response.json();
+
+            return data.results;
+        }
+
+        async function processData() {
+            const data = await fetchData();
+            const userStats = {};
+            const verifiedStats = {};
+
+            // Processing the data
+            data.forEach(item => {
+                const assignedTo = item.assigned_to;
+                const verified = item.verified;
+                const lastReviewed = new Date(item.last_reviewed);
+                const yearMonth = `${lastReviewed.getFullYear()}-${lastReviewed.getMonth() + 1}`;
+
+                // Track the number of changes per assigned person
+                if (!userStats[assignedTo]) {
+                    userStats[assignedTo] = 0;
+                }
+                userStats[assignedTo]++;
+
+                // Track verified true for each user
+                if (verified) {
+                    if (!verifiedStats[assignedTo]) {
+                        verifiedStats[assignedTo] = 0;
+                    }
+                    verifiedStats[assignedTo]++;
+                }
+            });
+
+            return { userStats, verifiedStats };
+        }
+
+        function renderCharts() {
+            processData().then(({ userStats, verifiedStats }) => {
+                const barLabels = Object.keys(userStats);
+                const barData = barLabels.map(user => userStats[user]);
+                const verifiedData = barLabels.map(user => verifiedStats[user] || 0);
+
+                const barChartCtx = document.getElementById('barChart').getContext('2d');
+                new Chart(barChartCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: barLabels,
+                        datasets: [
+                            {
+                                label: 'Total Tasks',
+                                data: barData,
+                                backgroundColor: '#42A5F5',
+                            },
+                            {
+                                label: 'Verified Tasks',
+                                data: verifiedData,
+                                backgroundColor: '#66BB6A',
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                            },
+                        },
+                    },
+                });
+
+                // Pie chart for user distribution
+                const pieChartCtx = document.getElementById('pieChart').getContext('2d');
+                const pieData = barLabels.map(user => userStats[user]);
+                new Chart(pieChartCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: barLabels,
+                        datasets: [
+                            {
+                                label: 'User Task Distribution',
+                                data: pieData,
+                                backgroundColor: ['#FF5733', '#FFBD33', '#33FF57', '#33A0FF', '#A833FF'],
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                        },
+                    },
+                });
+            });
+        }
+
+        renderCharts();
+    </script>
+</body>
+</html>
