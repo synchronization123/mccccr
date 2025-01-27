@@ -149,7 +149,7 @@
                 <td>${finding.verified ? 'Closed' : 'Open'}</td>
                 <td>${formatDate(finding.date) || 'N/A'}</td>
                 <td>${finding.planned_remediation_version || 'N/A'}</td>
-                <td>${formatReviewedDate(finding.Last_reviewed_by_changed)}</td> <!-- Display Reviewed Date -->
+                <td>${finding.verified ? formatReviewedDate(finding.Last_reviewed_by_changed) : ''}</td> <!-- Show Reviewed Date only if Verified -->
                 <td>
                 <button class="btn btn-edit" onclick="window.open('https://demo.defectdojo.org/finding/${finding.id}/edit?return_url=/finding', '_blank')">Edit</button>
                 <button class="btn btn-close" onclick="window.open('https://demo.defectdojo.org/finding/${finding.id}/close', '_blank')">Close</button>
