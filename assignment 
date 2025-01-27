@@ -24,14 +24,7 @@ required_columns = [
 ]
 merged_df = merged_df.reindex(columns=required_columns, fill_value="")
 
-# Step 4: Update Issue Type based on Security column
-if "Security" in merged_df.columns:
-    merged_df["Issue Type"] = merged_df.apply(
-        lambda row: "Security" if "Security" in str(row["Security"]) else row["Issue Type"], axis=1
-    )
-    merged_df.drop(columns=["Security"], inplace=True)
-
-# Step 5: Standardize Issue Type Naming
+# Step 4: Standardize Issue Type Naming
 issue_type_mapping = {
     "Bug": "Functional Bug",
     "Story": "Epic Story",
@@ -40,7 +33,7 @@ issue_type_mapping = {
 }
 merged_df["Issue Type"] = merged_df["Issue Type"].replace(issue_type_mapping)
 
-# Step 6: Prompt for user assignment
+# Step 5: Display Issue Type Summary and Get User Inputs
 issue_type_counts = merged_df["Issue Type"].value_counts()
 print("\n📌 Issue Type Summary:")
 print(issue_type_counts.to_string())
@@ -54,27 +47,32 @@ for issue_type, count in issue_type_counts.items():
         continue
 
     user_assignments[issue_type] = user_list
-    merged_df.loc[merged_df["Issue Type"] == issue_type, "Assigned To"] = pd.Series(
-        user_list * (count // len(user_list)) + user_list[:count % len(user_list)]
-    )
 
-# Step 7: Add Current Date to Date and Assigned On Columns
+    # Assign sequentially (first user gets first 30, then next user, and so on)
+    user_assignments_list = []
+    for idx, issue in enumerate(merged_df[merged_df["Issue Type"] == issue_type].index):
+        assigned_user = user_list[idx // 30 % len(user_list)]  # Sequential distribution
+        user_assignments_list.append(assigned_user)
+
+    merged_df.loc[merged_df["Issue Type"] == issue_type, "Assigned To"] = user_assignments_list
+
+# Step 6: Add Current Date to Date and Assigned On Columns
 merged_df["Date"] = current_date_str
 merged_df["Assigned On"] = current_date_str
 
-# Step 8: Split into Develop and Non-Develop Sheets
+# Step 7: Split into Develop and Non-Develop Sheets
 develop_mask = merged_df["Version"].str.contains("develop", case=False, na=False)
 develop_df = merged_df[develop_mask]
 non_develop_df = merged_df[~develop_mask & merged_df["Version"].notna()]  # Exclude blank Versions
 
-# Step 9: Save Output Files
+# Step 8: Save Output Files
 develop_file = f"{output_dir}/Develop_jiras_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
 non_develop_file = f"{output_dir}/Non_Develop_jiras_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
 
 develop_df.to_excel(develop_file, index=False)
 non_develop_df.to_excel(non_develop_file, index=False)
 
-# Step 10: Display Summary by Version and Assigned To
+# Step 9: Display Summary by Version and Assigned To
 version_summary = merged_df.groupby("Version")["Issue Key"].count().reset_index()
 version_summary.columns = ["Version", "Total Issues"]
 
@@ -94,7 +92,7 @@ total_version_count = version_summary["Total Issues"].sum()
 print(f"\n📌 Total Issue Type Count: {total_issue_type_count}")
 print(f"📌 Total Version-wise Issue Key Count: {total_version_count}")
 
-# Step 11: Move Old Files to Backup and Delete
+# Step 10: Move Old Files to Backup and Delete
 for f in all_files:
     if f not in [develop_file, non_develop_file]:  # Preserve output files
         backup_path = os.path.join(backup_dir, f)
