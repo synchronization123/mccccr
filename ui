@@ -3,9 +3,9 @@ import subprocess
 import tkinter as tk
 from tkinter import scrolledtext, filedialog
 
-# Paths to scripts
+# Paths
 JQLFETCH_SCRIPT = "steps/jqlfetch.pyw"
-DOWNLOAD_SCRIPT = "steps/download.py"  # Ensure correct path
+DOWNLOAD_SCRIPT = "steps/download.py"
 MERGE_SCRIPT = "mergedlatest.py"
 OUTPUT_DIR = "output/develop-andnondevelop/"
 
@@ -36,30 +36,22 @@ class AssignmentApp:
         self.console.see(tk.END)
 
     def run_script(self, command):
-        """Execute a Python script with command-line arguments."""
+        """Execute a Python script and log output."""
         self.log_message(f"Executing: {' '.join(command)}")
-        try:
-            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            stdout, stderr = process.communicate()
-            if stdout:
-                self.log_message(stdout.strip())
-            if stderr:
-                self.log_message(f"Error:\n{stderr.strip()}")
-        except Exception as e:
-            self.log_message(f"Execution failed: {e}")
+        subprocess.Popen(command, creationflags=subprocess.CREATE_NEW_CONSOLE)  # Open in new CMD window
 
     def run_jqlfetch(self):
-        self.run_script(["python", JQLFETCH_SCRIPT])
+        self.run_script(["cmd.exe", "/c", "python", JQLFETCH_SCRIPT"])
 
     def run_download(self):
-        """Run download.py with user-input JQL."""
-        jql_query = self.jql_entry.get().strip()
-        if not jql_query:
-            jql_query = "default JQL query"  # Use default if no input
-        self.run_script(["python", DOWNLOAD_SCRIPT, jql_query])
+        """Run multiple scripts inside a new CMD window."""
+        jql_query = self.jql_entry.get().strip() or "default JQL query"
+        command = f'start cmd.exe /k python "{DOWNLOAD_SCRIPT}" "{jql_query}"'
+        self.log_message(f"Opening Command Prompt: {command}")
+        subprocess.Popen(command, shell=True)
 
     def run_merge(self):
-        self.run_script(["python", MERGE_SCRIPT])
+        self.run_script(["cmd.exe", "/c", "python", MERGE_SCRIPT])
 
     def open_output_folder(self):
         """Open the output folder in file explorer."""
