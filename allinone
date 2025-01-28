@@ -6,10 +6,11 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from io import StringIO
 
 # -------------------- CONFIGURATIONS --------------------
-# JIRA API
-JIRA_URL = "https://jira.crm.com/rest/api/search?jql="
+# JIRA CSV URL
+JIRA_URL = "https://jira.crm.com/sr/jira.issueviews:searchrequest-csv-all-fields/temp/SearchRequest.csv?jqlQuery="
 JIRA_TOKEN = "jskdjdjd"
 
 # DefectDojo API
@@ -40,36 +41,70 @@ os.makedirs(MERGED_EXCEL_FOLDER, exist_ok=True)
 versions = input("Enter versions (comma-separated): ").split(",")
 versions = [v.strip() for v in versions]
 
-# -------------------- STEP 2: FETCH JIRA DATA --------------------
-def fetch_jira_count(jql):
+# -------------------- STEP 2: FETCH JIRA DATA (CSV) --------------------
+def fetch_jira_csv(jql_query):
     headers = {"Authorization": f"Bearer {JIRA_TOKEN}"}
-    response = requests.get(f"{JIRA_URL}{jql}", headers=headers)
-    return response.json().get("total", 0) if response.status_code == 200 else 0
+    response = requests.get(f"{JIRA_URL}{jql_query}", headers=headers)
 
-# -------------------- STEP 3: GENERATE HTML REPORT --------------------
+    if response.status_code == 200:
+        return pd.read_csv(StringIO(response.text))
+    else:
+        print(f"❌ Failed to fetch JIRA CSV for query: {jql_query}")
+        return pd.DataFrame()
+
+# -------------------- STEP 3: PROCESS CSV DATA --------------------
 for version in versions:
-    jql1 = f"labels in ({version}) OR Build(s) in ({version})"
-    jql2 = f"{jql1} AND component in (Security)"
+    jql_query = f"labels in ({version}) OR Build(s) in ({version})"
+    df = fetch_jira_csv(jql_query)
+
+    if df.empty:
+        continue
+
+    # Rename relevant columns
+    df = df.rename(columns={"Issue key": "Issue Key", "Issue Type": "Issue Type", "Priority": "Priority", "Components": "Components"})
     
-    count1 = fetch_jira_count(jql1)
-    count2 = fetch_jira_count(jql2)
+    # Fill missing values
+    df["Components"].fillna("", inplace=True)
+    df["Priority"].fillna("", inplace=True)
 
-    html_content = f"""
-    <html>
-    <body>
-        <h2>Version Details: {version}</h2>
-        <table border="1">
-            <tr><th>JQL</th><th>Count</th></tr>
-            <tr><td>{jql1}</td><td>{count1}</td></tr>
-            <tr><td>{jql2}</td><td>{count2}</td></tr>
-        </table>
-    </body>
-    </html>
-    """
-    with open(f"{DATA_HTML_FOLDER}/{version}.html", "w") as f:
-        f.write(html_content)
+    # Update issue type based on components and priority
+    df["Issue Type"] = df.apply(lambda row: f"{row['Issue Type']} Security" if "Security" in row["Components"] else row["Issue Type"], axis=1)
+    df["Issue Type"] = df.apply(lambda row: f"{row['Issue Type']} P1 High" if "P1 High" in row["Priority"] else row["Issue Type"], axis=1)
 
-# -------------------- STEP 4: EMAIL HTML REPORT --------------------
+    # Drop 'Priority' column
+    df.drop(columns=["Priority"], inplace=True)
+
+    # Save individual excel file
+    df.to_excel(f"{DATA_EXCEL_FOLDER}/{version}.xlsx", index=False)
+
+# -------------------- STEP 4: MERGE EXCEL FILES --------------------
+merged_df = pd.concat([pd.read_excel(f"{DATA_EXCEL_FOLDER}/{version}.xlsx") for version in versions])
+merged_df.insert(3, "Version", [version for version in versions for _ in range(len(merged_df) // len(versions))])
+
+merged_file_path = f"{MERGED_EXCEL_FOLDER}/Merged_{datetime.date.today()}.xlsx"
+merged_df.to_excel(merged_file_path, index=False)
+print(f"✅ Merged Excel Created: {merged_file_path}")
+
+# -------------------- STEP 5: ASSIGN USERS BASED ON ISSUE TYPE --------------------
+issue_type_assignment = {}
+for index, row in merged_df.iterrows():
+    issue_type = row["Issue Type"]
+    if issue_type not in issue_type_assignment:
+        assigned_user = input(f"Enter the username to assign for issue type '{issue_type}': ")
+        issue_type_assignment[issue_type] = assigned_user
+    merged_df.at[index, "Assigned to"] = issue_type_assignment[issue_type]
+
+merged_file_path_with_assignment = f"{MERGED_EXCEL_FOLDER}/Merged_Assigned_{datetime.date.today()}.xlsx"
+merged_df.to_excel(merged_file_path_with_assignment, index=False)
+print(f"✅ Assigned users to each issue type and saved in: {merged_file_path_with_assignment}")
+
+# -------------------- STEP 6: SUMMARY BY ISSUE TYPE --------------------
+issue_type_summary = merged_df.groupby("Issue Type").size().reset_index(name="Count")
+issue_type_summary_file = f"{MERGED_EXCEL_FOLDER}/Issue_Type_Summary_{datetime.date.today()}.xlsx"
+issue_type_summary.to_excel(issue_type_summary_file, index=False)
+print(f"✅ Summary by Issue Type saved in: {issue_type_summary_file}")
+
+# -------------------- STEP 7: EMAIL HTML REPORT --------------------
 def send_email(version, assigned_user_email):
     msg = MIMEMultipart()
     msg["From"] = SENDER_NAME
@@ -95,52 +130,7 @@ for version in versions:
     send_email(version, assigned_user_email)
     print(f"✅ Email sent for version {version}")
 
-# -------------------- STEP 5: FETCH & PROCESS JIRA DATA --------------------
-def fetch_jira_data(jql):
-    response = requests.get(f"{JIRA_URL}{jql}", headers={"Authorization": f"Bearer {JIRA_TOKEN}"})
-    return response.json()["issues"] if response.status_code == 200 else []
-
-for version in versions:
-    jql3 = f"labels in ({version}) OR Build(s) in ({version})"
-    issues = fetch_jira_data(jql3)
-
-    df = pd.DataFrame(issues)[["key", "fields.issuetype.name", "fields.priority.name", "fields.components"]]
-    df.columns = ["Issue key", "Issue type", "Priority", "Components"]
-
-    df["Components"] = df["Components"].apply(lambda x: ",".join([comp["name"] for comp in x]) if x else "")
-    df["Issue type"] = df.apply(lambda row: f"{row['Issue type']} Security" if "Security" in row["Components"] else row["Issue type"], axis=1)
-    df["Issue type"] = df.apply(lambda row: f"{row['Issue type']} P1 High" if "P1 High" in row["Priority"] else row["Issue type"], axis=1)
-
-    df.drop(columns=["Components", "Priority"], inplace=True)
-    df.to_excel(f"{DATA_EXCEL_FOLDER}/{version}.xlsx", index=False)
-
-# -------------------- STEP 6: MERGE ALL EXCEL FILES --------------------
-merged_df = pd.concat([pd.read_excel(f"{DATA_EXCEL_FOLDER}/{version}.xlsx") for version in versions])
-merged_df.insert(3, "Version", [version for version in versions for _ in range(len(merged_df) // len(versions))])
-merged_file_path = f"{MERGED_EXCEL_FOLDER}/Merged_{datetime.date.today()}.xlsx"
-merged_df.to_excel(merged_file_path, index=False)
-print(f"✅ Merged Excel Created: {merged_file_path}")
-
-# -------------------- STEP 7: ASSIGN USERS BASED ON ISSUE TYPE --------------------
-issue_type_assignment = {}
-for index, row in merged_df.iterrows():
-    issue_type = row["Issue type"]
-    if issue_type not in issue_type_assignment:
-        assigned_user = input(f"Enter the username to assign for issue type '{issue_type}': ")
-        issue_type_assignment[issue_type] = assigned_user
-    merged_df.at[index, "Assigned to"] = issue_type_assignment[issue_type]
-
-merged_file_path_with_assignment = f"{MERGED_EXCEL_FOLDER}/Merged_Assigned_{datetime.date.today()}.xlsx"
-merged_df.to_excel(merged_file_path_with_assignment, index=False)
-print(f"✅ Assigned users to each issue type and saved in: {merged_file_path_with_assignment}")
-
-# -------------------- STEP 8: SUMMARY BY ISSUE TYPE --------------------
-issue_type_summary = merged_df.groupby("Issue type").size().reset_index(name="Count")
-issue_type_summary_file = f"{MERGED_EXCEL_FOLDER}/Issue_Type_Summary_{datetime.date.today()}.xlsx"
-issue_type_summary.to_excel(issue_type_summary_file, index=False)
-print(f"✅ Summary by Issue Type saved in: {issue_type_summary_file}")
-
-# -------------------- STEP 9: UPLOAD TO DEFECTDOJO --------------------
+# -------------------- STEP 8: UPLOAD TO DEFECTDOJO --------------------
 def upload_to_defectdojo(file_path):
     files = {"file": open(file_path, "rb")}
     response = requests.post(f"{DOJO_URL}/findings", files=files, headers={"Authorization": f"Bearer {DOJO_TOKEN}"})
