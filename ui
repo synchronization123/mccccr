@@ -1,0 +1,66 @@
+import os
+import subprocess
+import tkinter as tk
+from tkinter import scrolledtext, filedialog
+
+# Path Constants (Modify if needed)
+JQLFETCH_SCRIPT = "steps/jqlfetch.pyw"
+DOWNLOAD_SCRIPT = "steps/downloadjiras.py"
+MERGE_SCRIPT = "mergedlatest.py"
+OUTPUT_DIR = "output/develop-andnondevelop/"
+
+class AssignmentApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Assignment - GUI Console")
+
+        # Buttons
+        tk.Button(root, text="Run JQL Fetch", command=self.run_jqlfetch, width=20).grid(row=0, column=0, padx=10, pady=5)
+        tk.Button(root, text="Download JIRAs", command=self.run_download, width=20).grid(row=1, column=0, padx=10, pady=5)
+        tk.Button(root, text="Merge Latest", command=self.run_merge, width=20).grid(row=2, column=0, padx=10, pady=5)
+        tk.Button(root, text="Open Output Folder", command=self.open_output_folder, width=20).grid(row=3, column=0, padx=10, pady=5)
+
+        # Console Output Box
+        self.console = scrolledtext.ScrolledText(root, width=80, height=20)
+        self.console.grid(row=0, column=1, rowspan=4, padx=10, pady=5)
+        self.log_message("Application Started.")
+
+    def log_message(self, message):
+        """Append logs to the console window."""
+        self.console.insert(tk.END, message + "\n")
+        self.console.see(tk.END)
+
+    def run_script(self, script_path):
+        """Execute the given Python script and log output."""
+        if os.path.exists(script_path):
+            self.log_message(f"Executing: {script_path}")
+            process = subprocess.Popen(["python", script_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            stdout, stderr = process.communicate()
+            if stdout:
+                self.log_message(stdout.strip())
+            if stderr:
+                self.log_message(f"Error:\n{stderr.strip()}")
+        else:
+            self.log_message(f"Error: {script_path} not found!")
+
+    def run_jqlfetch(self):
+        self.run_script(JQLFETCH_SCRIPT)
+
+    def run_download(self):
+        self.run_script(DOWNLOAD_SCRIPT)
+
+    def run_merge(self):
+        self.run_script(MERGE_SCRIPT)
+
+    def open_output_folder(self):
+        """Open the output folder in file explorer."""
+        if os.path.exists(OUTPUT_DIR):
+            filedialog.askopenfilename(initialdir=OUTPUT_DIR)
+            self.log_message(f"Opened: {OUTPUT_DIR}")
+        else:
+            self.log_message(f"Error: Output folder '{OUTPUT_DIR}' not found!")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = AssignmentApp(root)
+    root.mainloop()
