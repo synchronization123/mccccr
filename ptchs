@@ -114,14 +114,26 @@
         const defaultTags = ['#crm'];
         const defaultProduct = 33;
 
+        // Use async function to fetch data from the API
         async function fetchData() {
             try {
-                const response = await fetch(apiUrl);
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                // Check if the response is OK
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
                 const data = await response.json();
-                
                 const tableBody = document.getElementById('patchTable').getElementsByTagName('tbody')[0];
                 tableBody.innerHTML = ''; // Clear the table
 
+                // Loop through data and populate the table
                 data.forEach(item => {
                     const row = tableBody.insertRow();
 
@@ -162,7 +174,8 @@
                     `;
                 });
             } catch (error) {
-                alert('Error fetching data. Please try again later.');
+                console.error('Error fetching data: ', error);
+                alert('Error fetching data. Please check the API or network connection.');
             }
         }
 
