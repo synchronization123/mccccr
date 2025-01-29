@@ -138,10 +138,21 @@
           throw new Error('Failed to fetch users');
         }
         const usersDataResponse = await usersResponse.json();
-        usersData = usersDataResponse.reduce((acc, user) => {
-          acc[user.id] = user.username;
-          return acc;
-        }, {});
+
+        // Log the response to inspect the structure
+        console.log('Users Data Response:', usersDataResponse);
+
+        // Check if the response is an array
+        if (Array.isArray(usersDataResponse)) {
+          usersData = usersDataResponse.reduce((acc, user) => {
+            acc[user.id] = user.username;
+            return acc;
+          }, {});
+        } else {
+          // Handle cases where users data is not an array
+          console.error('Users data is not in expected array format');
+          throw new Error('Users data format is incorrect');
+        }
 
         // Clear any previous error message
         document.getElementById('errorMessage').textContent = '';
