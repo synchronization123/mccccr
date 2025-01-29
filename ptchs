@@ -144,13 +144,14 @@
 
         // Check if the response is an array
         if (Array.isArray(usersDataResponse)) {
+          // Map the users' data to a user ID => username mapping
           usersData = usersDataResponse.reduce((acc, user) => {
             acc[user.id] = user.username;
             return acc;
           }, {});
         } else {
           // Handle cases where users data is not an array
-          console.error('Users data is not in expected array format');
+          console.error('Users data is not in expected array format:', usersDataResponse);
           throw new Error('Users data format is incorrect');
         }
 
