@@ -142,16 +142,22 @@
         // Log the response to inspect the structure
         console.log('Users Data Response:', usersDataResponse);
 
-        // Check if the response is an array
+        // Check if the response is an array or an object containing users array
         if (Array.isArray(usersDataResponse)) {
-          // Map the users' data to a user ID => username mapping
+          // If it's an array, directly map the data
           usersData = usersDataResponse.reduce((acc, user) => {
             acc[user.id] = user.username;
             return acc;
           }, {});
+        } else if (usersDataResponse && usersDataResponse.users && Array.isArray(usersDataResponse.users)) {
+          // If the response contains a "users" field which is an array
+          usersData = usersDataResponse.users.reduce((acc, user) => {
+            acc[user.id] = user.username;
+            return acc;
+          }, {});
         } else {
-          // Handle cases where users data is not an array
-          console.error('Users data is not in expected array format:', usersDataResponse);
+          // Handle cases where users data is not an array or object as expected
+          console.error('Users data is in an unexpected format:', usersDataResponse);
           throw new Error('Users data format is incorrect');
         }
 
