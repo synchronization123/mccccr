@@ -127,12 +127,18 @@
       try {
         // Fetch engagements
         const engagementsResponse = await fetch('https://dojo.crm.com/api/v2/engagements');
+        if (!engagementsResponse.ok) {
+          throw new Error('Failed to fetch engagements');
+        }
         const engagementsData = await engagementsResponse.json();
 
         // Fetch users data to map lead IDs to usernames
         const usersResponse = await fetch('https://dojo.crm.com/api/v2/users');
-        const usersData = await usersResponse.json();
-        usersData = usersData.reduce((acc, user) => {
+        if (!usersResponse.ok) {
+          throw new Error('Failed to fetch users');
+        }
+        const usersDataResponse = await usersResponse.json();
+        usersData = usersDataResponse.reduce((acc, user) => {
           acc[user.id] = user.username;
           return acc;
         }, {});
@@ -143,6 +149,7 @@
         // Update the table with the fetched data
         updateTable(engagementsData);
       } catch (error) {
+        console.error('Error fetching data:', error);
         document.getElementById('errorMessage').textContent = 'Error fetching data. Please try again later.';
       }
     }
@@ -151,6 +158,13 @@
     function updateTable(data) {
       const tableBody = document.querySelector('#engagementsTable tbody');
       tableBody.innerHTML = '';
+
+      if (!data || data.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="10">No data available</td>';
+        tableBody.appendChild(row);
+        return;
+      }
 
       data.forEach(engagement => {
         const row = document.createElement('tr');
