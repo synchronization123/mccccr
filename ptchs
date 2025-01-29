@@ -30,6 +30,14 @@
             text-align: center;
             font-weight: bold;
         }
+        .search-box {
+            width: 100%;
+            max-width: 400px;
+            margin: 10px auto;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
@@ -37,8 +45,9 @@
 <div class="container">
     <h2 class="text-center mb-4">Engagements Dashboard</h2>
     
-    <div class="text-center">
+    <div class="d-flex justify-content-between mb-3">
         <button class="btn btn-primary" onclick="fetchEngagements()">Refresh Data</button>
+        <input type="text" id="searchInput" class="search-box" placeholder="Search Engagements...">
     </div>
 
     <div class="loader">
@@ -48,7 +57,7 @@
 
     <p class="error-message">Failed to fetch data. Ensure you are logged in.</p>
 
-    <div class="table-container mt-4">
+    <div class="table-container mt-3">
         <table class="table table-striped">
             <thead class="table-dark">
                 <tr>
@@ -75,9 +84,7 @@ function fetchEngagements() {
     $(".error-message").hide();
     $("#engagementsTableBody").html("");
 
-    fetch("https://dojo.crm.com/api/v2/engagements", {
-        credentials: "include"
-    })
+    fetch("https://dojo.crm.com/api/v2/engagements", { credentials: "include" })
     .then(response => {
         if (!response.ok) throw new Error("Network response was not ok");
         return response.json();
@@ -110,6 +117,16 @@ function fetchEngagements() {
         $(".error-message").show();
     });
 }
+
+// Live search function
+$(document).ready(function() {
+    $("#searchInput").on("keyup", function() {
+        var value = $(this).val().toLowerCase();
+        $("#engagementsTableBody tr").filter(function() {
+            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
+        });
+    });
+});
 </script>
 
 </body>
