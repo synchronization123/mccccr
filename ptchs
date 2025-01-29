@@ -129,6 +129,11 @@
         }
         const engagementsData = await engagementsResponse.json();
 
+        // Check if the data is an array
+        if (!Array.isArray(engagementsData)) {
+          throw new Error('Data is not an array');
+        }
+
         // Clear any previous error message
         document.getElementById('errorMessage').textContent = '';
 
