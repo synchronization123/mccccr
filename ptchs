@@ -166,13 +166,17 @@
             }
         }
 
+        // Function to get user by ID
         async function getUserById(userId) {
+            if (!userId) {
+                return "Unknown"; // Return a default value if userId is undefined or null
+            }
             try {
                 const response = await fetch(`https://dojo.crm.com/api/v2/users/${userId}`);
                 const userData = await response.json();
-                return userData.name.replace(/@.*/, "");
+                return userData.username ? userData.username.replace(/@.*/, "") : "Unknown"; // Handle username formatting
             } catch {
-                return "Unknown";
+                return "Unknown"; // Fallback if user fetch fails
             }
         }
 
@@ -187,7 +191,7 @@
             for (const item of paginatedData) {
                 const row = document.createElement("tr");
 
-                const assignedTo = await getUserById(item.lead);
+                const assignedTo = await getUserById(item.lead); // Fetch user details based on `lead` ID
                 const reviewedOn = item.status === "Completed" ? new Date().toISOString().split("T")[0] : "-";
 
                 row.innerHTML = `
