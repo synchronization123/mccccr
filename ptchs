@@ -57,27 +57,29 @@ document.addEventListener("DOMContentLoaded", async function() {
     const apiBaseUrl = "https://dojo.crm.com/api/v2";
     
     try {
+        // Fetch engagements
         const engagementsResponse = await fetch(`${apiBaseUrl}/engagements`);
-        if (!engagementsResponse.ok) {
-            throw new Error("Failed to fetch engagements");
-        }
-        const engagements = await engagementsResponse.json();
+        if (!engagementsResponse.ok) throw new Error("Failed to fetch engagements");
+        const engagementsData = await engagementsResponse.json();
+        const engagements = Array.isArray(engagementsData) ? engagementsData : engagementsData.data || [];
 
+        // Fetch users
         const usersResponse = await fetch(`${apiBaseUrl}/users`);
-        if (!usersResponse.ok) {
-            throw new Error("Failed to fetch users");
-        }
-        const users = await usersResponse.json();
+        if (!usersResponse.ok) throw new Error("Failed to fetch users");
+        const usersData = await usersResponse.json();
+        const usersArray = Array.isArray(usersData) ? usersData : usersData.data || [];
 
+        // Fetch products
         const productsResponse = await fetch(`${apiBaseUrl}/products`);
-        if (!productsResponse.ok) {
-            throw new Error("Failed to fetch products");
-        }
-        const products = await productsResponse.json();
+        if (!productsResponse.ok) throw new Error("Failed to fetch products");
+        const productsData = await productsResponse.json();
+        const productsArray = Array.isArray(productsData) ? productsData : productsData.data || [];
 
-        const usersMap = new Map(users.map(user => [user.id, `${user.first_name} ${user.last_name}`]));
-        const productsMap = new Map(products.map(product => [product.id, product.name]));
+        // Create lookup maps
+        const usersMap = new Map(usersArray.map(user => [user.id, `${user.first_name} ${user.last_name}`]));
+        const productsMap = new Map(productsArray.map(product => [product.id, product.name]));
 
+        // Populate table
         const tableBody = document.querySelector("#engagementsTable tbody");
         tableBody.innerHTML = "";
 
@@ -101,8 +103,10 @@ document.addEventListener("DOMContentLoaded", async function() {
             tableBody.innerHTML += row;
         });
 
+        // Show table and hide loading message
         document.getElementById("loading").style.display = "none";
         document.getElementById("engagementsTable").style.display = "table";
+
     } catch (error) {
         document.getElementById("loading").innerText = `Error: ${error.message}`;
     }
