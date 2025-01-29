@@ -130,6 +130,12 @@
                 }
 
                 const data = await response.json();
+
+                // Ensure that data is an array before attempting to iterate over it
+                if (!Array.isArray(data)) {
+                    throw new Error('The data returned from the API is not an array.');
+                }
+
                 const tableBody = document.getElementById('patchTable').getElementsByTagName('tbody')[0];
                 tableBody.innerHTML = ''; // Clear the table
 
