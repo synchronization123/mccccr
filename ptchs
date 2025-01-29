@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engagements Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            margin-top: 30px;
+        }
+        .table-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        .loading {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 class="text-center mb-4">Engagements Dashboard</h2>
+    <div class="table-container">
+        <div id="loading" class="loading">Loading data, please wait...</div>
+        <table class="table table-striped" id="engagementsTable" style="display: none;">
+            <thead class="table-dark">
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Version</th>
+                    <th>Lead</th>
+                    <th>Product</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+    const apiBaseUrl = "https://dojo.crm.com/api/v2";
+    
+    try {
+        const engagementsResponse = await fetch(`${apiBaseUrl}/engagements`);
+        if (!engagementsResponse.ok) {
+            throw new Error("Failed to fetch engagements");
+        }
+        const engagements = await engagementsResponse.json();
+
+        const usersResponse = await fetch(`${apiBaseUrl}/users`);
+        if (!usersResponse.ok) {
+            throw new Error("Failed to fetch users");
+        }
+        const users = await usersResponse.json();
+
+        const productsResponse = await fetch(`${apiBaseUrl}/products`);
+        if (!productsResponse.ok) {
+            throw new Error("Failed to fetch products");
+        }
+        const products = await productsResponse.json();
+
+        const usersMap = new Map(users.map(user => [user.id, `${user.first_name} ${user.last_name}`]));
+        const productsMap = new Map(products.map(product => [product.id, product.name]));
+
+        const tableBody = document.querySelector("#engagementsTable tbody");
+        tableBody.innerHTML = "";
+
+        engagements.forEach((eng, index) => {
+            const leadName = usersMap.get(eng.lead) || "Unknown";
+            const productName = productsMap.get(eng.product) || "Unknown";
+
+            const row = `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${eng.name}</td>
+                    <td>${eng.description}</td>
+                    <td>${eng.version}</td>
+                    <td>${leadName}</td>
+                    <td>${productName}</td>
+                    <td>${eng.target_start}</td>
+                    <td>${eng.target_end}</td>
+                    <td>${eng.status}</td>
+                </tr>
+            `;
+            tableBody.innerHTML += row;
+        });
+
+        document.getElementById("loading").style.display = "none";
+        document.getElementById("engagementsTable").style.display = "table";
+    } catch (error) {
+        document.getElementById("loading").innerText = `Error: ${error.message}`;
+    }
+});
+</script>
+
+</body>
+</html>
