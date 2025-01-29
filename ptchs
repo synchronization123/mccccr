@@ -1,191 +1,200 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>View Patch</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 20px;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Engagements View</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f4f4f9;
+    }
 
-        h1 {
-            text-align: center;
-            color: #333;
-        }
+    .container {
+      width: 90%;
+      margin: auto;
+      overflow: hidden;
+    }
 
-        .container {
-            margin-top: 20px;
-            background-color: white;
-            padding: 15px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            border-radius: 8px;
-        }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
 
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-            word-wrap: break-word;
-        }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border: 1px solid #ddd;
+    }
 
-        th {
-            background-color: #4CAF50;
-            color: white;
-        }
+    th {
+      background-color: #4CAF50;
+      color: white;
+    }
 
-        tr:hover {
-            background-color: #f1f1f1;
-        }
+    td {
+      background-color: #f9f9f9;
+    }
 
-        .buttons {
-            display: flex;
-            justify-content: space-around;
-        }
+    .actions button {
+      margin: 0 5px;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-size: 14px;
+      border: none;
+      border-radius: 5px;
+      transition: background-color 0.3s;
+    }
 
-        .btn {
-            padding: 6px 12px;
-            color: white;
-            background-color: #4CAF50;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
+    .actions .edit {
+      background-color: #4CAF50;
+      color: white;
+    }
 
-        .btn-danger {
-            background-color: #f44336;
-        }
+    .actions .edit:hover {
+      background-color: #45a049;
+    }
 
-        .btn-refresh {
-            margin-bottom: 20px;
-            display: block;
-            width: 100%;
-            padding: 10px;
-            text-align: center;
-            background-color: #008CBA;
-            color: white;
-            border: none;
-            border-radius: 5px;
-        }
+    .actions .close {
+      background-color: #f44336;
+      color: white;
+    }
 
-        .btn-refresh:hover {
-            background-color: #006f8f;
-        }
-    </style>
+    .actions .close:hover {
+      background-color: #e53935;
+    }
+
+    .refresh-btn {
+      margin: 20px 0;
+      padding: 10px 20px;
+      background-color: #008CBA;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+
+    .refresh-btn:hover {
+      background-color: #007bb5;
+    }
+
+    .error {
+      color: red;
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
-    <h1>View Patch Data</h1>
 
-    <div class="container">
-        <button class="btn-refresh" onclick="fetchData()">Refresh Table</button>
-        
-        <table id="patchTable">
-            <thead>
-                <tr>
-                    <th>Jira ID</th>
-                    <th>Issue Type</th>
-                    <th>Added On</th>
-                    <th>Comments</th>
-                    <th>Assigned To</th>
-                    <th>Status</th>
-                    <th>Assigned On</th>
-                    <th>Version</th>
-                    <th>Reviewed On</th>
-                    <th>Tags</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Data will be populated here dynamically -->
-            </tbody>
-        </table>
-    </div>
+  <div class="container">
+    <h1>Engagements View</h1>
+    <button class="refresh-btn" onclick="fetchData()">Refresh</button>
+    <div id="errorMessage" class="error"></div>
+    <table id="engagementsTable">
+      <thead>
+        <tr>
+          <th>Jira ID</th>
+          <th>Issue Type</th>
+          <th>Added On</th>
+          <th>Comments</th>
+          <th>Assigned To</th>
+          <th>Status</th>
+          <th>Assigned On</th>
+          <th>Version</th>
+          <th>Reviewed On</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Dynamic Data Rows will be inserted here -->
+      </tbody>
+    </table>
+  </div>
 
-    <script>
-        const apiUrl = 'https://dojo.crm.com/api/v2/engagements';
-        const defaultTags = ['#crm'];
-        const defaultProduct = 33;
+  <script>
+    // Global variable to store user data
+    let usersData = {};
 
-        // Use async function to fetch data from the API
-        async function fetchData() {
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
+    // Fetch Engagements Data from API
+    async function fetchData() {
+      try {
+        // Fetch engagements
+        const engagementsResponse = await fetch('https://dojo.crm.com/api/v2/engagements');
+        const engagementsData = await engagementsResponse.json();
 
-                // Check if the response is OK
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
+        // Fetch users data to map lead IDs to usernames
+        const usersResponse = await fetch('https://dojo.crm.com/api/v2/users');
+        const usersData = await usersResponse.json();
+        usersData = usersData.reduce((acc, user) => {
+          acc[user.id] = user.username;
+          return acc;
+        }, {});
 
-                const data = await response.json();
+        // Clear any previous error message
+        document.getElementById('errorMessage').textContent = '';
 
-                // Ensure that data is an array before attempting to iterate over it
-                if (!Array.isArray(data)) {
-                    throw new Error('The data returned from the API is not an array.');
-                }
+        // Update the table with the fetched data
+        updateTable(engagementsData);
+      } catch (error) {
+        document.getElementById('errorMessage').textContent = 'Error fetching data. Please try again later.';
+      }
+    }
 
-                const tableBody = document.getElementById('patchTable').getElementsByTagName('tbody')[0];
-                tableBody.innerHTML = ''; // Clear the table
+    // Update the table with the fetched engagements data
+    function updateTable(data) {
+      const tableBody = document.querySelector('#engagementsTable tbody');
+      tableBody.innerHTML = '';
 
-                // Loop through data and populate the table
-                data.forEach(item => {
-                    const row = tableBody.insertRow();
+      data.forEach(engagement => {
+        const row = document.createElement('tr');
 
-                    const jiraId = item.name;
-                    const issueType = item.reason;
-                    const addedOn = item.created.split('T')[0]; // Date only (YYYY-MM-DD)
-                    const comments = item.description || '';
-                    const assignedTo = item.lead;
-                    const status = item.status;
-                    const assignedOn = item.target_start.split('T')[0];
-                    const version = item.version;
-                    const reviewedOn = status === 'Completed' ? new Date().toISOString().split('T')[0] : '';
-                    const tags = item.tags.length ? item.tags.join(', ') : defaultTags.join(', ');
+        // Format date for "Added On" and "Reviewed On"
+        const addedOn = new Date(engagement.created).toLocaleDateString();
+        let reviewedOn = engagement.status === 'Completed' ? new Date().toLocaleDateString() : '';
 
-                    const cells = [
-                        jiraId,
-                        issueType,
-                        addedOn,
-                        comments,
-                        assignedTo,
-                        status,
-                        assignedOn,
-                        version,
-                        reviewedOn,
-                        tags
-                    ];
+        // Get lead username from users data
+        const assignedTo = usersData[engagement.lead] || 'N/A';
 
-                    cells.forEach(cellData => {
-                        const cell = row.insertCell();
-                        cell.textContent = cellData;
-                    });
+        row.innerHTML = `
+          <td>${engagement.name}</td>
+          <td>${engagement.reason}</td>
+          <td>${addedOn}</td>
+          <td>${engagement.description}</td>
+          <td>${assignedTo}</td>
+          <td>${engagement.status}</td>
+          <td>${new Date(engagement.target_start).toLocaleDateString()}</td>
+          <td>${engagement.version}</td>
+          <td>${reviewedOn}</td>
+          <td class="actions">
+            <button class="edit" onclick="openEdit(${engagement.id})">Edit</button>
+            <button class="close" onclick="openClose(${engagement.id})">Close</button>
+          </td>
+        `;
 
-                    // Actions Column (Edit, Close)
-                    const actionsCell = row.insertCell();
-                    actionsCell.innerHTML = `
-                        <button class="btn" onclick="window.open('https://dojo.crm.com/engagement/${item.id}/edit', '_blank')">Edit</button>
-                        <button class="btn btn-danger" onclick="window.open('https://dojo.crm.com/engagement/${item.id}/close', '_blank')">Close</button>
-                    `;
-                });
-            } catch (error) {
-                console.error('Error fetching data: ', error);
-                alert('Error fetching data. Please check the API or network connection.');
-            }
-        }
+        tableBody.appendChild(row);
+      });
+    }
 
-        window.onload = fetchData;
-    </script>
+    // Open the edit URL in a new tab
+    function openEdit(id) {
+      window.open(`https://dojo.crm.com/engagement/${id}/edit`, '_blank');
+    }
+
+    // Open the close URL in a new tab
+    function openClose(id) {
+      window.open(`https://dojo.crm.com/engagement/${id}/close`, '_blank');
+    }
+
+    // Initial fetch of data
+    fetchData();
+  </script>
+
 </body>
 </html>
