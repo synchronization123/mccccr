@@ -3,120 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tab Navigation</title>
+    <title>View</title>
     <style>
+        /* Global Styles */
         body {
-            font-family: 'Arial', sans-serif;
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f4f7fc;
-            display: flex;
+            background-color: #f4f4f9;
         }
+        
+        /* Sidebar Styles */
         .sidebar {
-            width: 250px;
-            background-color: #2c3e50;
-            color: white;
-            padding: 20px;
-            box-sizing: border-box;
+            width: 200px;
             height: 100vh;
+            background-color: #343a40;
+            padding-top: 20px;
             position: fixed;
-            left: 0;
         }
-        .sidebar h2 {
-            color: #ecf0f1;
-            font-size: 24px;
-            margin-bottom: 30px;
+
+        .sidebar ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .sidebar ul li {
+            padding: 15px;
             text-align: center;
         }
-        .sidebar a {
+
+        .sidebar ul li a {
+            color: white;
+            text-decoration: none;
             display: block;
-            padding: 15px;
-            margin: 10px 0;
-            background-color: #34495e;
-            text-decoration: none;
-            color: white;
-            border-radius: 5px;
             font-size: 18px;
-            transition: background-color 0.3s, transform 0.2s ease-in-out;
         }
-        .sidebar a:hover {
-            background-color: #1abc9c;
-            transform: translateX(10px);
+
+        .sidebar ul li a:hover {
+            background-color: #495057;
+            border-radius: 5px;
         }
-        .sidebar a:active {
-            background-color: #16a085;
-        }
-        .content {
-            margin-left: 270px;
+
+        /* Main content styles */
+        .main-content {
+            margin-left: 220px;
             padding: 20px;
-            background-color: #ecf0f1;
-            flex-grow: 1;
-            height: 100vh;
-            overflow-y: auto;
         }
-        .content h1 {
-            color: #34495e;
-            font-size: 32px;
-            margin-bottom: 20px;
+
+        h1 {
+            font-size: 2rem;
+            color: #343a40;
         }
-        .content p {
-            color: #7f8c8d;
-            font-size: 18px;
-            line-height: 1.6;
-        }
-        .content .btn {
-            padding: 12px 20px;
-            background-color: #3498db;
+
+        /* Tab button styles */
+        .tab-button {
+            padding: 15px;
+            background-color: #007bff;
             color: white;
-            text-decoration: none;
-            border-radius: 5px;
+            border: none;
+            width: 100%;
             font-size: 18px;
-            margin-top: 20px;
-            display: inline-block;
-            transition: background-color 0.3s;
+            cursor: pointer;
+            text-align: left;
         }
-        .content .btn:hover {
-            background-color: #2980b9;
+
+        .tab-button:hover {
+            background-color: #0056b3;
+        }
+
+        .tab-button:focus {
+            outline: none;
+        }
+
+        /* Active Tab Styles */
+        .active {
+            background-color: #0056b3;
         }
     </style>
 </head>
 <body>
 
-<div class="sidebar">
-    <h2>Navigation</h2>
-    <a href="#" onclick="loadContent('patch')">Patch</a>
-    <a href="#" onclick="loadContent('crm')">CRM</a>
-    <a href="#" onclick="loadContent('cst')">CST</a>
-    <a href="#" onclick="loadContent('stt')">STT</a>
-    <a href="#" onclick="loadContent('rdt')">RDT</a>
-    <a href="#" onclick="loadContent('hhj')">HHJ</a>
-    <a href="#" onclick="loadContent('wss')">WSS</a>
-</div>
+    <!-- Sidebar with menu items -->
+    <div class="sidebar">
+        <ul>
+            <li><a href="#" class="tab-button" data-url="https://example.com/patch">Patch</a></li>
+            <li><a href="#" class="tab-button" data-url="https://example.com/crm">CRM</a></li>
+            <li><a href="#" class="tab-button" data-url="https://example.com/cst">CST</a></li>
+            <li><a href="#" class="tab-button" data-url="https://example.com/stt">STT</a></li>
+            <li><a href="#" class="tab-button" data-url="https://example.com/rdt">RDT</a></li>
+            <li><a href="#" class="tab-button" data-url="https://example.com/hhj">HHJ</a></li>
+            <li><a href="#" class="tab-button" data-url="https://example.com/wss">WSS</a></li>
+        </ul>
+    </div>
 
-<div class="content">
-    <h1>Welcome to the Tab Navigation</h1>
-    <p>Click on any of the options in the sidebar to visit the respective pages.</p>
-    <a id="redirectLink" class="btn" href="#" target="_blank" style="display: none;">Go to Selected Page</a>
-</div>
+    <!-- Main content area -->
+    <div class="main-content">
+        <h1>Select a tab to open in a new window</h1>
+    </div>
 
-<script>
-    const urls = {
-        'patch': 'https://example.com/patch',
-        'crm': 'https://dojo.crm.com',  // Example URL with X-Frame-Options restriction
-        'cst': 'https://example.com/cst',
-        'stt': 'https://example.com/stt',
-        'rdt': 'https://example.com/rdt',
-        'hhj': 'https://example.com/hhj',
-        'wss': 'https://example.com/wss'
-    };
+    <script>
+        // Get all the menu items
+        const tabButtons = document.querySelectorAll('.tab-button');
 
-    function loadContent(tab) {
-        const redirectLink = document.getElementById('redirectLink');
-        redirectLink.style.display = 'inline-block';
-        redirectLink.href = urls[tab];
-        redirectLink.innerHTML = `Go to ${tab.toUpperCase()} Page`;
-    }
-</script>
+        // Add click event listener to each tab button
+        tabButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Get the URL from the data-url attribute
+                const url = this.getAttribute('data-url');
+
+                // Open the URL in a new tab
+                window.open(url, '_blank');
+
+                // Add active class to the clicked tab and remove from others
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    </script>
 
 </body>
 </html>
