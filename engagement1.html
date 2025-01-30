@@ -1,5 +1,6 @@
-<!DOCTYPE html>  
+<!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,19 +12,23 @@
             padding: 0;
             background-color: #f8f9fa;
         }
+
         .filters {
             display: flex;
             align-items: center;
             gap: 10px;
             margin-bottom: 10px;
         }
+
         table {
             width: 100%;
             table-layout: fixed;
             border-collapse: collapse;
             margin-top: 10px;
         }
-        th, td {
+
+        th,
+        td {
             border: 1px solid #ddd;
             padding: 8px;
             text-align: left;
@@ -31,21 +36,26 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+
         th {
             background-color: #007bff;
             color: white;
             cursor: pointer;
         }
-        input, select {
+
+        input,
+        select {
             padding: 6px;
             margin-top: 10px;
             border: 1px solid #ddd;
         }
+
         .pagination {
             margin-top: 10px;
             display: flex;
             justify-content: center;
         }
+
         .pagination button {
             padding: 8px 12px;
             margin: 2px;
@@ -53,10 +63,12 @@
             background-color: white;
             cursor: pointer;
         }
+
         .pagination button.active {
             background-color: #007bff;
             color: white;
         }
+
         .action-buttons a {
             text-decoration: none;
             padding: 5px 10px;
@@ -66,15 +78,18 @@
             color: white;
             border-radius: 4px;
         }
+
         .close-btn {
             background-color: #dc3545 !important;
         }
+
         .count-display {
             margin-bottom: 10px;
             font-weight: bold;
         }
     </style>
 </head>
+
 <body>
 
     <div class="filters">
@@ -211,12 +226,12 @@
             const date2 = document.getElementById("date2").value;
 
             filteredEngagements = engagements.filter(e => {
-                const matchesStatus = 
-                    (showCompleted && e.status === "Completed") || 
-                    (displayAllData) || 
+                const matchesStatus =
+                    (showCompleted && e.status === "Completed") ||
+                    (displayAllData) ||
                     (!showCompleted && !displayAllData && ["Not Started", "On Hold", "In Progress"].includes(e.status));
                 const assignedToName = usersMap.get(e.lead) || "Not Assigned";
-                const matchesSearch = 
+                const matchesSearch =
                     (e.name && e.name.toLowerCase().includes(searchTerm)) ||
                     (e.description && e.description.toLowerCase().includes(searchTerm)) ||
                     (e.status && e.status.toLowerCase().includes(searchTerm)) ||
@@ -224,7 +239,7 @@
                 const matchesAssignedTo = !selectedAssignedTo || (assignedToName === selectedAssignedTo);
                 const matchesVersion = !selectedVersion || (e.version === selectedVersion);
                 const matchesStatusFilter = !selectedStatus || (e.status === selectedStatus);
-                
+
                 let matchesDateRange = true;
                 if (date1) {
                     matchesDateRange = matchesDateRange && new Date(e.target_end) >= new Date(date1);
@@ -247,7 +262,7 @@
         function renderTable() {
             const tableBody = document.querySelector("#engagementTable tbody");
             tableBody.innerHTML = "";
-            
+
             let start = (currentPage - 1) * rowsPerPage;
             let end = start + rowsPerPage;
             let paginatedItems = filteredEngagements.slice(start, end);
@@ -282,14 +297,12 @@
             const paginationContainer = document.getElementById("pagination");
             paginationContainer.innerHTML = "";
 
-            const totalPages = Math.ceil(filteredEngagements.length / rowsPerPage);
-            const firstPage = 1;
-            const lastPage = totalPages;
+            const totalPages = Math.ceil(totalRecords / rowsPerPage);
 
             // First button
             const firstButton = document.createElement("button");
             firstButton.textContent = "First";
-            firstButton.addEventListener("click", () => changePage(firstPage));
+            firstButton.addEventListener("click", () => changePage(1));
             paginationContainer.appendChild(firstButton);
 
             // Previous button
@@ -297,15 +310,6 @@
             prevButton.textContent = "Previous";
             prevButton.addEventListener("click", () => changePage(currentPage - 1));
             paginationContainer.appendChild(prevButton);
-
-            // Page buttons
-            for (let i = 1; i <= totalPages; i++) {
-                let pageButton = document.createElement("button");
-                pageButton.textContent = i;
-                pageButton.classList.toggle("active", i === currentPage);
-                pageButton.addEventListener("click", () => changePage(i));
-                paginationContainer.appendChild(pageButton);
-            }
 
             // Next button
             const nextButton = document.createElement("button");
@@ -316,13 +320,13 @@
             // Last button
             const lastButton = document.createElement("button");
             lastButton.textContent = "Last";
-            lastButton.addEventListener("click", () => changePage(lastPage));
+            lastButton.addEventListener("click", () => changePage(totalPages));
             paginationContainer.appendChild(lastButton);
         }
 
         function changePage(page) {
             if (page < 1) page = 1;
-            if (page > Math.ceil(filteredEngagements.length / rowsPerPage)) page = Math.ceil(filteredEngagements.length / rowsPerPage);
+            if (page > Math.ceil(totalRecords / rowsPerPage)) page = Math.ceil(totalRecords / rowsPerPage);
             currentPage = page;
             fetchEngagements(currentPage);
         }
