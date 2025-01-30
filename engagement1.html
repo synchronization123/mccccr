@@ -161,27 +161,44 @@
                 }
 
                 populateFilters();
-                engagements = data.results.sort((a, b) => new Date(b.target_start) - new Date(a.target_start));
+                engagements = data.results.sort((a, b) => new Date(b.target_end) - new Date(a.target_end));
                 applyFilters();
             } catch (error) {
                 console.error('Error fetching engagements:', error);
             }
         }
 
-        function applyFilters() {
-            const searchTerm = document.getElementById("searchInput").value.toLowerCase();
-            const selectedAssignedTo = document.getElementById("assignedToFilter").value;
-            const selectedVersion = document.getElementById("versionFilter").value;
-            const selectedStatus = document.getElementById("statusFilter").value;
-
-            filteredEngagements = engagements.filter(e => {
-                const assignedToName = usersMap.get(e.lead) || "Not Assigned";
-                return (!selectedAssignedTo || assignedToName === selectedAssignedTo) &&
-                       (!selectedVersion || e.version === selectedVersion) &&
-                       (!selectedStatus || e.status === selectedStatus) &&
-                       (!searchTerm || (e.name && e.name.toLowerCase().includes(searchTerm)));
+        function populateFilters() {
+            const assignedDropdown = document.getElementById("assignedToFilter");
+            assignedDropdown.innerHTML = '<option value="">Filter by Assigned To</option>';
+            assignedToSet.forEach(name => {
+                let option = document.createElement("option");
+                option.value = name;
+                option.textContent = name;
+                assignedDropdown.appendChild(option);
             });
 
+            const versionDropdown = document.getElementById("versionFilter");
+            versionDropdown.innerHTML = '<option value="">Filter by Version</option>';
+            versionSet.forEach(version => {
+                let option = document.createElement("option");
+                option.value = version;
+                option.textContent = version;
+                versionDropdown.appendChild(option);
+            });
+
+            const statusDropdown = document.getElementById("statusFilter");
+            statusDropdown.innerHTML = '<option value="">Filter by Status</option>';
+            statusSet.forEach(status => {
+                let option = document.createElement("option");
+                option.value = status;
+                option.textContent = status;
+                statusDropdown.appendChild(option);
+            });
+        }
+
+        function applyFilters() {
+            filteredEngagements = engagements;
             updateFilteredCount();
             renderTable();
         }
@@ -193,14 +210,14 @@
         function renderTable() {
             const tableBody = document.querySelector("#engagementTable tbody");
             tableBody.innerHTML = "";
-
+            
             let start = (currentPage - 1) * rowsPerPage;
             let end = start + rowsPerPage;
             let paginatedItems = filteredEngagements.slice(start, end);
 
             paginatedItems.forEach(engagement => {
                 let assignedToName = usersMap.get(engagement.lead) || "Not Assigned";
-                let targetEndDate = engagement.status === "Completed" ? engagement.target_end : "";
+                let targetEndDate = engagement.target_end || "-";
 
                 let row = `
                     <tr>
@@ -220,15 +237,9 @@
                 `;
                 tableBody.innerHTML += row;
             });
-
-            renderPagination();
         }
 
-        async function loadData() {
-            await fetchEngagements();
-        }
-
-        loadData();
+        fetchEngagements();
     </script>
 
 </body>
