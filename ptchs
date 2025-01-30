@@ -142,7 +142,7 @@
                 }
 
                 populateAssignedToFilter();
-                engagements = data.results.sort((a, b) => new Date(b.created) - new Date(a.created)); // Sort by created date (newest to oldest)
+                engagements = data.results.sort((a, b) => new Date(b.created) - new Date(a.created));
                 applyFilters();
             } catch (error) {
                 console.error('Error fetching engagements:', error);
