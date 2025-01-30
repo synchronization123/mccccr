@@ -148,7 +148,7 @@
 
         async function fetchEngagements(page = 1) {
             try {
-                const response = await fetch(`https://demo.defectdojo.org/api/v2/engagements?limit=${batchSize}&offset=${(page - 1) * batchSize}`);
+                const response = await fetch(`https://demo.defectdojo.org/api/v2/engagements?limit=${batchSize}&offset=${(page - 1) * batchSize}&ordering=-created`);
                 const data = await response.json();
 
                 totalRecords = data.count; // Total number of records
