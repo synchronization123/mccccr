@@ -1,205 +1,227 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Engagements View</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-      background-color: #f4f4f9;
-    }
-
-    .container {
-      width: 90%;
-      margin: auto;
-      overflow: hidden;
-    }
-
-    h1 {
-      text-align: center;
-      color: #333;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-
-    th, td {
-      padding: 12px;
-      text-align: left;
-      border: 1px solid #ddd;
-    }
-
-    th {
-      background-color: #4CAF50;
-      color: white;
-    }
-
-    td {
-      background-color: #f9f9f9;
-    }
-
-    .actions button {
-      margin: 0 5px;
-      padding: 5px 10px;
-      cursor: pointer;
-      font-size: 14px;
-      border: none;
-      border-radius: 5px;
-      transition: background-color 0.3s;
-    }
-
-    .actions .edit {
-      background-color: #4CAF50;
-      color: white;
-    }
-
-    .actions .edit:hover {
-      background-color: #45a049;
-    }
-
-    .actions .close {
-      background-color: #f44336;
-      color: white;
-    }
-
-    .actions .close:hover {
-      background-color: #e53935;
-    }
-
-    .refresh-btn {
-      margin: 20px 0;
-      padding: 10px 20px;
-      background-color: #008CBA;
-      color: white;
-      font-size: 16px;
-      cursor: pointer;
-      border-radius: 5px;
-    }
-
-    .refresh-btn:hover {
-      background-color: #007bb5;
-    }
-
-    .error {
-      color: red;
-      text-align: center;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engagements</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f8f9fa;
+        }
+        .filters {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        input, select {
+            padding: 6px;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+        }
+        .pagination {
+            margin-top: 10px;
+            display: flex;
+            justify-content: center;
+        }
+        .pagination button {
+            padding: 8px 12px;
+            margin: 2px;
+            border: 1px solid #007bff;
+            background-color: white;
+            cursor: pointer;
+        }
+        .pagination button.active {
+            background-color: #007bff;
+            color: white;
+        }
+        .action-buttons a {
+            text-decoration: none;
+            padding: 5px 10px;
+            margin: 2px;
+            display: inline-block;
+            background-color: #28a745;
+            color: white;
+            border-radius: 4px;
+        }
+        .close-btn {
+            background-color: #dc3545 !important;
+        }
+    </style>
 </head>
 <body>
 
-  <div class="container">
-    <h1>Engagements View</h1>
-    <button class="refresh-btn" onclick="fetchData()">Refresh</button>
-    <div id="errorMessage" class="error"></div>
-    <table id="engagementsTable">
-      <thead>
-        <tr>
-          <th>Jira ID</th>
-          <th>Issue Type</th>
-          <th>Added On</th>
-          <th>Comments</th>
-          <th>Assigned To</th>
-          <th>Status</th>
-          <th>Assigned On</th>
-          <th>Version</th>
-          <th>Reviewed On</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <!-- Dynamic Data Rows will be inserted here -->
-      </tbody>
+    <div class="filters">
+        <input type="text" id="searchInput" placeholder="Search by any column...">
+        <label><input type="checkbox" id="allOpen" checked> All Open</label>
+        <label><input type="checkbox" id="showCompleted"> Show Completed</label>
+        <select id="assignedToFilter">
+            <option value="">Filter by Assigned To</option>
+        </select>
+    </div>
+
+    <table id="engagementTable">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Version</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Status</th>
+                <th>Type</th>
+                <th>Assigned To</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
     </table>
-  </div>
 
-  <script>
-    // Fetch Engagements Data from API
-    async function fetchData() {
-      try {
-        // Fetch engagements
-        const engagementsResponse = await fetch('https://dojo.crm.com/api/v2/engagements');
-        if (!engagementsResponse.ok) {
-          throw new Error('Failed to fetch engagements');
-        }
-        const engagementsData = await engagementsResponse.json();
+    <div class="pagination" id="pagination"></div>
 
-        // Check if the data is an array
-        if (!Array.isArray(engagementsData)) {
-          throw new Error('Data is not an array');
+    <script>
+        let engagements = [];
+        let usersMap = new Map();
+        let assignedToSet = new Set();
+        let filteredEngagements = [];
+        let currentPage = 1;
+        const rowsPerPage = 10;
+
+        function getCurrentDate() {
+            return new Date().toISOString().split('T')[0];
         }
 
-        // Clear any previous error message
-        document.getElementById('errorMessage').textContent = '';
+        async function fetchUserById(userId) {
+            if (!userId) return "Not Assigned";
+            try {
+                const response = await fetch(`https://demo.defectdojo.org/api/v2/users/?id=${userId}`);
+                const data = await response.json();
+                if (data.count > 0) {
+                    const user = data.results[0];
+                    return `${user.first_name || ''} ${user.last_name || ''}`.trim() || "Not Assigned";
+                }
+                return "Not Assigned";
+            } catch (error) {
+                console.error(`Error fetching user ${userId}:`, error);
+                return "Not Assigned";
+            }
+        }
 
-        // Update the table with the fetched data
-        updateTable(engagementsData);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        document.getElementById('errorMessage').textContent = 'Error fetching data. Please try again later.';
-      }
-    }
+        async function fetchEngagements() {
+            try {
+                const response = await fetch(`https://demo.defectdojo.org/api/v2/engagements`);
+                const data = await response.json();
+                
+                for (let engagement of data.results) {
+                    if (!usersMap.has(engagement.lead)) {
+                        let assignedToName = await fetchUserById(engagement.lead);
+                        usersMap.set(engagement.lead, assignedToName);
+                        assignedToSet.add(assignedToName);
+                    }
+                }
 
-    // Update the table with the fetched engagements data
-    function updateTable(data) {
-      const tableBody = document.querySelector('#engagementsTable tbody');
-      tableBody.innerHTML = '';
+                populateAssignedToFilter();
+                engagements = data.results.sort((a, b) => new Date(b.created) - new Date(a.created)); // Sort by created date (newest to oldest)
+                applyFilters();
+            } catch (error) {
+                console.error('Error fetching engagements:', error);
+            }
+        }
 
-      if (!data || data.length === 0) {
-        const row = document.createElement('tr');
-        row.innerHTML = '<td colspan="10">No data available</td>';
-        tableBody.appendChild(row);
-        return;
-      }
+        function populateAssignedToFilter() {
+            const assignedDropdown = document.getElementById("assignedToFilter");
+            assignedDropdown.innerHTML = '<option value="">Filter by Assigned To</option>';
+            assignedToSet.forEach(name => {
+                let option = document.createElement("option");
+                option.value = name;
+                option.textContent = name;
+                assignedDropdown.appendChild(option);
+            });
+        }
 
-      data.forEach(engagement => {
-        const row = document.createElement('tr');
+        function applyFilters() {
+            const showCompleted = document.getElementById("showCompleted").checked;
+            const showOpen = document.getElementById("allOpen").checked;
+            const searchTerm = document.getElementById("searchInput").value.toLowerCase();
+            const selectedAssignedTo = document.getElementById("assignedToFilter").value;
 
-        // Format date for "Added On" and "Reviewed On"
-        const addedOn = new Date(engagement.created).toLocaleDateString();
-        let reviewedOn = engagement.status === 'Completed' ? new Date().toLocaleDateString() : '';
+            filteredEngagements = engagements.filter(e => {
+                const matchesStatus = (showOpen && ["Not Started", "On Hold", "In Progress"].includes(e.status)) || 
+                                      (showCompleted && e.status === "Completed");
+                const assignedToName = usersMap.get(e.lead) || "Not Assigned";
+                const matchesSearch = 
+                    (e.name && e.name.toLowerCase().includes(searchTerm)) ||
+                    (e.description && e.description.toLowerCase().includes(searchTerm)) ||
+                    (e.status && e.status.toLowerCase().includes(searchTerm)) ||
+                    (assignedToName && assignedToName.toLowerCase().includes(searchTerm));
+                const matchesAssignedTo = !selectedAssignedTo || (assignedToName === selectedAssignedTo);
 
-        // Since we removed the users API, we will just use the lead as a placeholder
-        const assignedTo = engagement.lead || 'N/A';
+                return matchesStatus && matchesSearch && matchesAssignedTo;
+            });
 
-        row.innerHTML = `
-          <td>${engagement.name}</td>
-          <td>${engagement.reason}</td>
-          <td>${addedOn}</td>
-          <td>${engagement.description}</td>
-          <td>${assignedTo}</td>
-          <td>${engagement.status}</td>
-          <td>${new Date(engagement.target_start).toLocaleDateString()}</td>
-          <td>${engagement.version}</td>
-          <td>${reviewedOn}</td>
-          <td class="actions">
-            <button class="edit" onclick="openEdit(${engagement.id})">Edit</button>
-            <button class="close" onclick="openClose(${engagement.id})">Close</button>
-          </td>
-        `;
+            renderTable();
+        }
 
-        tableBody.appendChild(row);
-      });
-    }
+        function renderTable() {
+            const tableBody = document.querySelector("#engagementTable tbody");
+            tableBody.innerHTML = "";
+            
+            let start = (currentPage - 1) * rowsPerPage;
+            let end = start + rowsPerPage;
+            let paginatedItems = filteredEngagements.slice(start, end);
 
-    // Open the edit URL in a new tab
-    function openEdit(id) {
-      window.open(`https://dojo.crm.com/engagement/${id}/edit`, '_blank');
-    }
+            paginatedItems.forEach(engagement => {
+                let assignedToName = usersMap.get(engagement.lead) || "Not Assigned";
+                let targetEndDate = engagement.status === "Completed" ? engagement.target_end : "";
 
-    // Open the close URL in a new tab
-    function openClose(id) {
-      window.open(`https://dojo.crm.com/engagement/${id}/close`, '_blank');
-    }
+                let row = `
+                    <tr>
+                        <td>${engagement.name || "-"}</td>
+                        <td>${engagement.description || "-"}</td>
+                        <td>${engagement.version || "-"}</td>
+                        <td>${engagement.target_start || "-"}</td>
+                        <td>${targetEndDate}</td>
+                        <td>${engagement.status || "-"}</td>
+                        <td>${engagement.engagement_type || "-"}</td>
+                        <td>${assignedToName}</td>
+                        <td class="action-buttons">
+                            <a href="https://demo.defectdojo.org/engagements/${engagement.id}/edit" target="_blank">Edit</a>
+                            <a href="https://demo.defectdojo.org/engagements/${engagement.id}/close" target="_blank" class="close-btn">Close</a>
+                        </td>
+                    </tr>
+                `;
+                tableBody.innerHTML += row;
+            });
+        }
 
-    // Initial fetch of data
-    fetchData();
-  </script>
+        async function loadData() {
+            await fetchEngagements();
+        }
+
+        loadData();
+        setInterval(fetchEngagements, 300000);
+    </script>
 
 </body>
 </html>
