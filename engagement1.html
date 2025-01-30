@@ -105,6 +105,7 @@
         <input type="text" id="searchInput" placeholder="Search by any column...">
         <label><input type="checkbox" id="showCompleted"> Show Completed</label>
         <label><input type="checkbox" id="displayAllData"> Display All Data</label>
+        <label><input type="checkbox" id="sortByDate"> Sort by Latest Start Date</label>
         <select id="assignedToFilter">
             <option value="">Filter by Assigned To</option>
         </select>
@@ -172,7 +173,6 @@
 
         async function fetchEngagements(page = 1) {
             try {
-                // Fetch data with pagination, ordering by 'target_start' in descending order
                 const response = await fetch(`https://demo.defectdojo.org/api/v2/engagements?limit=${batchSize}&offset=${(page - 1) * batchSize}&ordering=-target_start`);
                 const data = await response.json();
 
@@ -234,6 +234,7 @@
             const selectedStatus = document.getElementById("statusFilter").value;
             const date1 = document.getElementById("date1").value;
             const date2 = document.getElementById("date2").value;
+            const sortByDate = document.getElementById("sortByDate").checked;
 
             filteredEngagements = engagements.filter(e => {
                 const matchesStatus =
@@ -260,6 +261,10 @@
 
                 return matchesStatus && matchesSearch && matchesAssignedTo && matchesVersion && matchesStatusFilter && matchesDateRange;
             });
+
+            if (sortByDate) {
+                filteredEngagements = filteredEngagements.sort((a, b) => new Date(b.target_start) - new Date(a.target_start)); // Sort by target_start
+            }
 
             updateFilteredCount();
             renderTable();
@@ -347,7 +352,7 @@
             if (page < 1) page = 1;
             if (page > Math.ceil(filteredEngagements.length / rowsPerPage)) page = Math.ceil(filteredEngagements.length / rowsPerPage);
             currentPage = page;
-            fetchEngagements(currentPage);
+            renderTable();
         }
 
         function clearFilters() {
@@ -359,6 +364,7 @@
             document.getElementById("displayAllData").checked = false;
             document.getElementById("date1").value = "";
             document.getElementById("date2").value = "";
+            document.getElementById("sortByDate").checked = false;
             applyFilters();
         }
 
@@ -374,6 +380,7 @@
         document.getElementById("statusFilter").addEventListener("change", applyFilters);
         document.getElementById("date1").addEventListener("change", applyFilters);
         document.getElementById("date2").addEventListener("change", applyFilters);
+        document.getElementById("sortByDate").addEventListener("change", applyFilters);
         document.getElementById("clearFilters").addEventListener("click", clearFilters);
 
         loadData();
