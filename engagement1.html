@@ -198,7 +198,41 @@
         }
 
         function applyFilters() {
-            filteredEngagements = engagements;
+            const showCompleted = document.getElementById("showCompleted").checked;
+            const displayAllData = document.getElementById("displayAllData").checked;
+            const searchTerm = document.getElementById("searchInput").value.toLowerCase();
+            const selectedAssignedTo = document.getElementById("assignedToFilter").value;
+            const selectedVersion = document.getElementById("versionFilter").value;
+            const selectedStatus = document.getElementById("statusFilter").value;
+            const date1 = document.getElementById("date1").value;
+            const date2 = document.getElementById("date2").value;
+
+            filteredEngagements = engagements.filter(e => {
+                const matchesStatus = 
+                    (showCompleted && e.status === "Completed") || 
+                    (displayAllData) || 
+                    (!showCompleted && !displayAllData && ["Not Started", "On Hold", "In Progress"].includes(e.status));
+                const assignedToName = usersMap.get(e.lead) || "Not Assigned";
+                const matchesSearch = 
+                    (e.name && e.name.toLowerCase().includes(searchTerm)) ||
+                    (e.description && e.description.toLowerCase().includes(searchTerm)) ||
+                    (e.status && e.status.toLowerCase().includes(searchTerm)) ||
+                    (assignedToName && assignedToName.toLowerCase().includes(searchTerm));
+                const matchesAssignedTo = !selectedAssignedTo || (assignedToName === selectedAssignedTo);
+                const matchesVersion = !selectedVersion || (e.version === selectedVersion);
+                const matchesStatusFilter = !selectedStatus || (e.status === selectedStatus);
+                
+                let matchesDateRange = true;
+                if (date1) {
+                    matchesDateRange = matchesDateRange && new Date(e.target_end) >= new Date(date1);
+                }
+                if (date2) {
+                    matchesDateRange = matchesDateRange && new Date(e.target_end) <= new Date(date2);
+                }
+
+                return matchesStatus && matchesSearch && matchesAssignedTo && matchesVersion && matchesStatusFilter && matchesDateRange;
+            });
+
             updateFilteredCount();
             renderTable();
         }
@@ -237,9 +271,56 @@
                 `;
                 tableBody.innerHTML += row;
             });
+
+            renderPagination();
         }
 
-        fetchEngagements();
+        function renderPagination() {
+            const paginationContainer = document.getElementById("pagination");
+            paginationContainer.innerHTML = "";
+
+            const totalPages = Math.ceil(filteredEngagements.length / rowsPerPage);
+            for (let i = 1; i <= totalPages; i++) {
+                let pageButton = document.createElement("button");
+                pageButton.textContent = i;
+                pageButton.classList.toggle("active", i === currentPage);
+                pageButton.addEventListener("click", () => changePage(i));
+                paginationContainer.appendChild(pageButton);
+            }
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            renderTable();
+        }
+
+        function clearFilters() {
+            document.getElementById("searchInput").value = "";
+            document.getElementById("assignedToFilter").value = "";
+            document.getElementById("versionFilter").value = "";
+            document.getElementById("statusFilter").value = "";
+            document.getElementById("showCompleted").checked = false;
+            document.getElementById("displayAllData").checked = false;
+            document.getElementById("date1").value = "";
+            document.getElementById("date2").value = "";
+            applyFilters();
+        }
+
+        async function loadData() {
+            await fetchEngagements();
+        }
+
+        document.getElementById("searchInput").addEventListener("input", applyFilters);
+        document.getElementById("showCompleted").addEventListener("change", applyFilters);
+        document.getElementById("displayAllData").addEventListener("change", applyFilters);
+        document.getElementById("assignedToFilter").addEventListener("change", applyFilters);
+        document.getElementById("versionFilter").addEventListener("change", applyFilters);
+        document.getElementById("statusFilter").addEventListener("change", applyFilters);
+        document.getElementById("date1").addEventListener("change", applyFilters);
+        document.getElementById("date2").addEventListener("change", applyFilters);
+        document.getElementById("clearFilters").addEventListener("click", clearFilters);
+
+        loadData();
     </script>
 
 </body>
