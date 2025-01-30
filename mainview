@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tab Navigation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+        }
+        .sidebar {
+            width: 200px;
+            background-color: #f4f4f4;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .sidebar a {
+            display: block;
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #ddd;
+            text-decoration: none;
+            color: black;
+            border-radius: 4px;
+        }
+        .sidebar a:hover {
+            background-color: #aaa;
+        }
+        .content {
+            flex-grow: 1;
+            padding: 20px;
+            background-color: #f9f9f9;
+            box-sizing: border-box;
+            margin-left: 20px;
+        }
+        .content iframe {
+            width: 100%;
+            height: 80vh;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <a href="#" onclick="loadContent('patch')">Patch</a>
+    <a href="#" onclick="loadContent('crm')">CRM</a>
+    <a href="#" onclick="loadContent('cst')">CST</a>
+    <a href="#" onclick="loadContent('stt')">STT</a>
+    <a href="#" onclick="loadContent('rdt')">RDT</a>
+    <a href="#" onclick="loadContent('hhj')">HHJ</a>
+    <a href="#" onclick="loadContent('wss')">WSS</a>
+</div>
+
+<div class="content">
+    <iframe id="mainContent" src="" frameborder="0"></iframe>
+</div>
+
+<script>
+    const urls = {
+        'patch': 'https://example.com/patch',
+        'crm': 'https://example.com/crm',
+        'cst': 'https://example.com/cst',
+        'stt': 'https://example.com/stt',
+        'rdt': 'https://example.com/rdt',
+        'hhj': 'https://example.com/hhj',
+        'wss': 'https://example.com/wss'
+    };
+
+    function loadContent(tab) {
+        const iframe = document.getElementById('mainContent');
+        iframe.src = urls[tab];
+    }
+</script>
+
+</body>
+</html>
