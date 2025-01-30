@@ -56,16 +56,25 @@
             justify-content: center;
         }
 
-        .pagination button {
+        .pagination button,
+        .pagination a {
             padding: 8px 12px;
             margin: 2px;
             border: 1px solid #007bff;
             background-color: white;
             cursor: pointer;
+            text-decoration: none;
         }
 
-        .pagination button.active {
+        .pagination button.active,
+        .pagination a.active {
             background-color: #007bff;
+            color: white;
+        }
+
+        .pagination button:hover,
+        .pagination a:hover {
+            background-color: #0056b3;
             color: white;
         }
 
@@ -298,7 +307,7 @@
             const paginationContainer = document.getElementById("pagination");
             paginationContainer.innerHTML = "";
 
-            const totalPages = Math.ceil(totalRecords / rowsPerPage);
+            const totalPages = Math.ceil(filteredEngagements.length / rowsPerPage);
 
             // First button
             const firstButton = document.createElement("button");
@@ -311,6 +320,15 @@
             prevButton.textContent = "Previous";
             prevButton.addEventListener("click", () => changePage(currentPage - 1));
             paginationContainer.appendChild(prevButton);
+
+            // Page numbers
+            for (let i = 1; i <= totalPages; i++) {
+                let pageButton = document.createElement("button");
+                pageButton.textContent = i;
+                pageButton.classList.toggle("active", i === currentPage);
+                pageButton.addEventListener("click", () => changePage(i));
+                paginationContainer.appendChild(pageButton);
+            }
 
             // Next button
             const nextButton = document.createElement("button");
@@ -327,7 +345,7 @@
 
         function changePage(page) {
             if (page < 1) page = 1;
-            if (page > Math.ceil(totalRecords / rowsPerPage)) page = Math.ceil(totalRecords / rowsPerPage);
+            if (page > Math.ceil(filteredEngagements.length / rowsPerPage)) page = Math.ceil(filteredEngagements.length / rowsPerPage);
             currentPage = page;
             fetchEngagements(currentPage);
         }
