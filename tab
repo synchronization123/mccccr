@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tabbed Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f8f9fa;
+        }
+
+        .tab-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            border: none;
+            background-color: #ddd;
+            margin: 0 5px;
+            font-size: 16px;
+            border-radius: 5px;
+            transition: 0.3s;
+        }
+
+        .tab:hover {
+            background-color: #bbb;
+        }
+
+        .tab.active {
+            background-color: #007bff;
+            color: white;
+            font-weight: bold;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: white;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Tab Buttons -->
+    <div class="tab-container">
+        <button class="tab active" onclick="openTab(event, 'Dashboard')">Dashboard</button>
+        <button class="tab" onclick="openTab(event, 'MCR')">MCR</button>
+        <button class="tab" onclick="openTab(event, 'VAPT')">VAPT</button>
+        <button class="tab" onclick="openTab(event, 'SCT')">SCT</button>
+    </div>
+
+    <!-- Dashboard (Default Tab) -->
+    <div id="Dashboard" class="tab-content active">
+        <h2>Dashboard</h2>
+        <p>Welcome to the Dashboard! Here you can get an overview of all engagements.</p>
+    </div>
+
+    <!-- Tab 1: MCR -->
+    <div id="MCR" class="tab-content">
+        <h2>MCR</h2>
+        << Add MCR code here >>
+        <script>
+            function filterData() {
+                if (!document.getElementById('MCR').classList.contains('active')) return;
+                console.log("MCR filter function called.");
+            }
+        </script>
+    </div>
+
+    <!-- Tab 2: VAPT -->
+    <div id="VAPT" class="tab-content">
+        <h2>VAPT</h2>
+        << Add VAPT code here >>
+        <script>
+            function filterData() {
+                if (!document.getElementById('VAPT').classList.contains('active')) return;
+                console.log("VAPT filter function called.");
+            }
+        </script>
+    </div>
+
+    <!-- Tab 3: SCT -->
+    <div id="SCT" class="tab-content">
+        <h2>SCT</h2>
+        << Add SCT code here >>
+        <script>
+            function filterData() {
+                if (!document.getElementById('SCT').classList.contains('active')) return;
+                console.log("SCT filter function called.");
+            }
+        </script>
+    </div>
+
+    <script>
+        function openTab(event, tabName) {
+            var i, tabContent, tabButtons;
+            
+            // Hide all tab contents
+            tabContent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabContent.length; i++) {
+                tabContent[i].style.display = "none";
+                tabContent[i].classList.remove("active");
+            }
+
+            // Remove 'active' class from all tabs
+            tabButtons = document.getElementsByClassName("tab");
+            for (i = 0; i < tabButtons.length; i++) {
+                tabButtons[i].classList.remove("active");
+            }
+
+            // Show the current tab and mark it as active
+            document.getElementById(tabName).style.display = "block";
+            document.getElementById(tabName).classList.add("active");
+            event.currentTarget.classList.add("active");
+        }
+    </script>
+
+</body>
+
+</html>
