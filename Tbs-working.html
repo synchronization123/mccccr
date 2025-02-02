@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel-like Tabs</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f4f4f4;
+        }
+        .tabs {
+            display: flex;
+            justify-content: center;
+            background: #fff;
+            padding: 10px;
+            border-bottom: 2px solid #ddd;
+        }
+        .tab {
+            padding: 12px 20px;
+            margin: 0 5px;
+            background: #e0e0e0;
+            border-radius: 12px 12px 0 0;
+            cursor: pointer;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+        .tab:hover {
+            background: #d0d0d0;
+        }
+        .tab.active {
+            background: #0078d4;
+            color: white;
+            font-weight: bold;
+        }
+        .content {
+            padding: 20px;
+            text-align: center;
+            display: none;
+        }
+        .content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab(event, 'dashboard')">Dashboard</div>
+        <div class="tab" onclick="switchTab(event, 'tab1')">Engagements</div>
+        <div class="tab" onclick="switchTab(event, 'tab2')">Tests</div>
+        <div class="tab" onclick="switchTab(event, 'tab3')">Findings</div>
+        <div class="tab" onclick="switchTab(event, 'tab4')">Tab 4</div>
+        <div class="tab" onclick="switchTab(event, 'tab5')">Tab 5</div>
+        <div class="tab" onclick="switchTab(event, 'tab6')">Tab 6</div>
+        <div class="tab" onclick="switchTab(event, 'tab7')">Tab 7</div>
+    </div>
+    <div id="dashboard" class="content active">Welcome to the Dashboard</div>
+    <div id="tab1" class="content">
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engagements</title>
+    <!-- Link to FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f8f9fa;
+        }
+
+        .filters {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        /* Style the refresh button */
+        #refreshButton_mcr {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: #58BCE2;
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 18px;
+            border-radius: 5px;
+        }
+
+        #refreshButton_mcr:hover {
+            background-color: #0056b3;
+        }
+
+        table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            white-space: normal;
+            word-wrap: break-word;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        th {
+            background-color: #58BCE2;
+            color: white;
+            cursor: pointer;
+        }
+
+        input,
+        select {
+            padding: 6px;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+        }
+
+        .pagination {
+            margin-top: 10px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .pagination button,
+        .pagination a {
+            padding: 8px 12px;
+            margin: 2px;
+            border: 1px solid #58BCE2;
+            background-color: white;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .pagination button.active,
+        .pagination a.active {
+            background-color: #58BCE2;
+            color: white;
+        }
+
+        .pagination button:hover,
+        .pagination a:hover {
+            background-color: #0056b3;
+            color: white;
+        }
+
+        .action-buttons a {
+            text-decoration: none;
+            padding: 5px 10px;
+            margin: 2px;
+            display: inline-block;
+            background-color: #28a745;
+            color: white;
+            border-radius: 4px;
+        }
+
+        .close-btn {
+            background-color: #dc3545 !important;
+        }
+
+        .count-display {
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .action-buttons i {
+            font-size: 20px;
+            margin: 0 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Refresh Button (Right Top) -->
+    <button id="refreshButton_mcr" title="Refresh Data">
+        <i class="fas fa-sync-alt"></i>
+    </button>
+
+    <div class="filters">
+        <input type="text" id="searchInput_mcr" placeholder="Search by any column...">
+        <label><input type="checkbox" id="showCompleted_mcr"> Show Completed</label>
+        <label><input type="checkbox" id="displayAllData_mcr"> Display All Data</label>
+        <label><input type="checkbox" id="sortByDate_mcr"> Sort by Latest Start Date</label>
+        <select id="assignedToFilter_mcr" disabled>
+            <option value="">Filter by Assigned To</option>
+        </select>
+        <select id="versionFilter_mcr">
+            <option value="">Filter by Version</option>
+        </select>
+        <select id="statusFilter_mcr">
+            <option value="">Filter by Status</option>
+        </select>
+        <input type="date" id="date1_mcr" placeholder="Start Date">
+        <input type="date" id="date2_mcr" placeholder="End Date">
+        <button id="clearFilters_mcr">Clear All Filters</button>
+    </div>
+
+    <div class="count-display">
+        <span id="filteredCount_mcr">Total Records: 0</span>
+    </div>
+
+    <table id="engagementTable_mcr">
+        <thead>
+            <tr>
+				<th>Task Type</th>
+				<th>Added Date</th>
+				<th>Title</th>
+				<th>Version</th>
+				<th>Assigned To</th>
+				<th>AppSec ETA Date</th>
+                <th>RM ETA Date</th>
+                <th>Created By</th>
+                <th>Status</th>
+				<th>Completion Date</th>
+				<th>Notes</th>
+                <th>Comments</th> <!-- Review Column -->
+                <th>Actions</th> <!-- Actions Column -->
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <div class="pagination" id="pagination_mcr"></div>
+
+    <script>
+        let engagements_mcr = [];
+        let usersMap_mcr = new Map();
+        let assignedToSet_mcr = new Set();
+        let versionSet_mcr = new Set();
+        let statusSet_mcr = new Set();
+        let filteredEngagements_mcr = [];
+        let currentPage_mcr = 1;
+        const rowsPerPage_mcr = 6;
+        const batchSize_mcr = 6;
+        let totalRecords_mcr = 0;
+        const pagesToShow_mcr = 10;
+        let loggedInUser_mcr = {};
+        let loggedInUser_mcrId = null;
+
+        // Function to fetch the logged-in user's details from the user_profile endpoint
+        async function fetchloggedInUser_mcr() {
+            try {
+                const response_mcr = await fetch('https://demo.defectdojo.org/api/v2/user_profile/');
+                const data_mcr = await response_mcr.json();
+                if (data_mcr.user) {
+                    loggedInUser_mcr = data_mcr.user;
+                    loggedInUser_mcrId = loggedInUser_mcr.id; // Save the logged-in user's ID
+                } else {
+                    console.error('Logged-in user not found.');
+                }
+            } catch (error_mcr) {
+                console.error('Error fetching logged-in user:', error_mcr);
+            }
+        }
+
+        // Fetch user details by ID (for engagements data)
+        async function fetchUserById_mcr(userId_mcr) {
+            if (!userId_mcr) return "Not Assigned";
+            try {
+                const response_mcr = await fetch(`https://demo.defectdojo.org/api/v2/users/?id=${userId_mcr}`);
+                const data_mcr = await response_mcr.json();
+                if (data_mcr.count > 0) {
+                    const user_mcr = data_mcr.results[0];
+                    return `${user_mcr.first_name || ''} ${user_mcr.last_name || ''}`.trim() || "Not Assigned";
+                }
+                return "Not Assigned";
+            } catch (error_mcr) {
+                console.error(`Error fetching user ${userId_mcr}:`, error_mcr);
+                return "Not Assigned";
+            }
+        }
+
+        // Fetch notes associated with the engagement ID
+        async function fetchNotesForEngagement_mcr(engagementId_mcr) {
+            try {
+                const response_mcr = await fetch(`https://demo.defectdojo.org/api/v2/engagements/${engagementId_mcr}/`);
+                const data_mcr = await response_mcr.json();
+                if (data_mcr && data_mcr.notes && data_mcr.notes.length > 0) {
+                    const notes = data_mcr.notes.map(note => {
+                        const date = new Date(note.date).toLocaleDateString("en-GB"); // Date format 2021-06-21
+                        return `
+                            <strong>Added on: ${date}</strong><br>
+                            <strong>By: ${note.author.first_name} ${note.author.last_name}</strong><br>
+                            <i>${note.entry}</i><br><br>
+                        `;
+                    }).join("<br>");
+                    return notes;
+                }
+                return "No Notes Available";
+            } catch (error_mcr) {
+                console.error(`Error fetching notes for engagement ${engagementId_mcr}:`, error_mcr);
+                return "Error fetching notes";
+            }
+        }
+
+        // Fetch engagements data
+        async function fetchEngagements_mcr(page_mcr = 1) {
+            try {
+                const response_mcr = await fetch(`https://demo.defectdojo.org/api/v2/engagements?limit=${batchSize_mcr}&offset=${(page_mcr - 1) * batchSize_mcr}&ordering=-target_start`);
+                const data_mcr = await response_mcr.json();
+
+                totalRecords_mcr = data_mcr.count;
+                engagements_mcr = data_mcr.results;
+
+                // Iterate through engagements to gather necessary details
+                for (let engagement_mcr of engagements_mcr) {
+                    if (!usersMap_mcr.has(engagement_mcr.lead)) {
+                        let assignedToName_mcr = await fetchUserById_mcr(engagement_mcr.lead);
+                        usersMap_mcr.set(engagement_mcr.lead, assignedToName_mcr);
+                        assignedToSet_mcr.add(assignedToName_mcr);
+                    }
+                    if (engagement_mcr.version) versionSet_mcr.add(engagement_mcr.version);
+                    if (engagement_mcr.status) statusSet_mcr.add(engagement_mcr.status);
+                }
+
+                populateFilters_mcr();
+                applyFilters_mcr(); // Apply filter to only show the logged-in user's data
+            } catch (error_mcr) {
+                console.error('Error fetching engagements:', error_mcr);
+            }
+        }
+
+        // Populate the filters, including the "Assigned To" dropdown
+        async function populateFilters_mcr() {
+            const assignedDropdown_mcr = document.getElementById("assignedToFilter_mcr");
+            assignedDropdown_mcr.innerHTML = '<option value="">Filter by Assigned To</option>';
+
+            // Wait for the logged-in user to be fetched
+            await fetchloggedInUser_mcr();
+
+            // Populate the "Assigned To" filter with the logged-in user's name and other options disabled
+            assignedToSet_mcr.forEach(name_mcr => {
+                let option_mcr = document.createElement("option");
+                option_mcr.value = name_mcr;
+                option_mcr.textContent = name_mcr;
+
+                // Disable all other options except the logged-in user
+                if (name_mcr !== `${loggedInUser_mcr.first_name} ${loggedInUser_mcr.last_name}`) {
+                    option_mcr.disabled = true;
+                } else {
+                    option_mcr.selected = true;  // Select the logged-in user's name
+                }
+
+                assignedDropdown_mcr.appendChild(option_mcr);
+            });
+
+            const versionDropdown_mcr = document.getElementById("versionFilter_mcr");
+            versionDropdown_mcr.innerHTML = '<option value="">Filter by Version</option>';
+            versionSet_mcr.forEach(version_mcr => {
+                let option_mcr = document.createElement("option");
+                option_mcr.value = version_mcr;
+                option_mcr.textContent = version_mcr;
+                versionDropdown_mcr.appendChild(option_mcr);
+            });
+
+            const statusDropdown_mcr = document.getElementById("statusFilter_mcr");
+            statusDropdown_mcr.innerHTML = '<option value="">Filter by Status</option>';
+            statusSet_mcr.forEach(status_mcr => {
+                let option_mcr = document.createElement("option");
+                option_mcr.value = status_mcr;
+                option_mcr.textContent = status_mcr;
+                statusDropdown_mcr.appendChild(option_mcr);
+            });
+        }
+
+        function applyFilters_mcr() {
+            const showCompleted_mcr = document.getElementById("showCompleted_mcr").checked;
+            const displayAllData_mcr = document.getElementById("displayAllData_mcr").checked;
+            const searchTerm_mcr = document.getElementById("searchInput_mcr").value.toLowerCase();
+            const selectedAssignedTo_mcr = document.getElementById("assignedToFilter_mcr").value;
+            const selectedVersion_mcr = document.getElementById("versionFilter_mcr").value;
+            const selectedStatus_mcr = document.getElementById("statusFilter_mcr").value;
+            const date1_mcr = document.getElementById("date1_mcr").value;
+            const date2_mcr = document.getElementById("date2_mcr").value;
+
+            let startDate = date1_mcr ? new Date(date1_mcr) : null;
+            let endDate = date2_mcr ? new Date(date2_mcr) : null;
+
+            if (startDate) {
+                startDate.setHours(0, 0, 0, 0);
+            }
+            if (endDate) {
+                endDate.setHours(23, 59, 59, 999);
+            }
+
+            filteredEngagements_mcr = engagements_mcr.filter(e_mcr => {
+                const matchesStatus_mcr =
+                    (showCompleted_mcr && e_mcr.status === "Completed") ||
+                    (displayAllData_mcr) ||
+                    (!showCompleted_mcr && !displayAllData_mcr && ["Not Started", "On Hold", "In Progress"].includes(e_mcr.status));
+
+                const assignedToName_mcr = usersMap_mcr.get(e_mcr.lead) || "Not Assigned";
+                const matchesSearch_mcr =
+                    (e_mcr.name && e_mcr.name.toLowerCase().includes(searchTerm_mcr)) ||
+                    (e_mcr.description && e_mcr.description.toLowerCase().includes(searchTerm_mcr)) ||
+                    (e_mcr.status && e_mcr.status.toLowerCase().includes(searchTerm_mcr)) ||
+                    (assignedToName_mcr && assignedToName_mcr.toLowerCase().includes(searchTerm_mcr));
+
+                const matchesAssignedTo_mcr = !selectedAssignedTo_mcr || (assignedToName_mcr === selectedAssignedTo_mcr);
+                const matchesVersion_mcr = !selectedVersion_mcr || (e_mcr.version === selectedVersion_mcr);
+                const matchesStatusFilter_mcr = !selectedStatus_mcr || (e_mcr.status === selectedStatus_mcr);
+
+                let matchesDateRange_mcr = true;
+
+                const engagementDate = new Date(e_mcr.updated);
+                if (startDate) {
+                    matchesDateRange_mcr = matchesDateRange_mcr && engagementDate >= startDate;
+                }
+                if (endDate) {
+                    matchesDateRange_mcr = matchesDateRange_mcr && engagementDate <= endDate;
+                }
+
+                return (e_mcr.lead === loggedInUser_mcrId) && matchesStatus_mcr && matchesSearch_mcr && matchesAssignedTo_mcr && matchesVersion_mcr && matchesStatusFilter_mcr && matchesDateRange_mcr;
+            });
+
+            updateFilteredCount_mcr();
+            renderTable_mcr();
+        }
+
+        function updateFilteredCount_mcr() {
+            document.getElementById("filteredCount_mcr").textContent = `Total Records: ${filteredEngagements_mcr.length}`;
+        }
+
+        async function renderTable_mcr() {
+            const tableBody_mcr = document.querySelector("#engagementTable_mcr tbody");
+            tableBody_mcr.innerHTML = "";
+
+            let start_mcr = (currentPage_mcr - 1) * rowsPerPage_mcr;
+            let end_mcr = start_mcr + rowsPerPage_mcr;
+            let paginatedItems_mcr = filteredEngagements_mcr.slice(start_mcr, end_mcr);
+
+            for (let engagement_mcr of paginatedItems_mcr) {
+                let assignedToName_mcr = usersMap_mcr.get(engagement_mcr.lead) || "Not Assigned";
+                let updatedDate_mcr = (engagement_mcr.active === false && engagement_mcr.updated) ? new Date(engagement_mcr.updated).toISOString().split('T')[0] : "";
+
+                // Fetch notes for the current engagement
+                let notes = await fetchNotesForEngagement_mcr(engagement_mcr.id);
+
+                // Dynamically create the Edit, Close, and Feedback links using the engagement ID
+                let editLink_mcr = `https://demo.defectdojo.org/engagement/${engagement_mcr.id}/edit`;
+                let closeLink_mcr = `https://demo.defectdojo.org/engagement/${engagement_mcr.id}/close`;
+
+                // Feedback link for respective engagement ID (opens in popup)
+                let feedbackButton_mcr = `<a href="javascript:void(0);" onclick="openPopup('${engagement_mcr.id}', 'feedback')"><i class="fas fa-comment"></i> Add Notes</a>`;
+
+                let row_mcr = `
+                    <tr>
+						<td>${engagement_mcr.tags || "-"}</td>
+						<td>${engagement_mcr.created || "-"}</td>
+                        <td>${engagement_mcr.name || "-"}</td>
+						<td>${engagement_mcr.version || "-"}</td>
+						<td>${assignedToName_mcr}</td>
+						<td>${engagement_mcr.target_start || "-"}</td>
+						<td>${engagement_mcr.target_end || "-"}</td>
+						<td>${engagement_mcr.reason || "-"}</td>
+                        <td>${engagement_mcr.status || "-"}</td>						
+                        <td>${updatedDate_mcr || "-"}</td>
+						<td>${engagement_mcr.description || "-"}</td>
+                        <td>${notes}</td> <!-- Review column for notes -->
+                        <td class="action-buttons">
+                            <a href="javascript:void(0);" class="close-btn" onclick="openPopup('${engagement_mcr.id}', 'edit')"><i class="fas fa-edit"></i> Edit</a>
+                            <a href="javascript:void(0);" class="close-btn" onclick="openPopup('${engagement_mcr.id}', 'close')"><i class="fas fa-tasks"></i> Close</a>
+                            ${feedbackButton_mcr} <!-- Feedback icon -->
+                        </td>
+                    </tr>
+                `;
+                tableBody_mcr.innerHTML += row_mcr;
+            }
+
+            renderPagination_mcr();
+        }
+
+        function renderPagination_mcr() {
+            const paginationContainer_mcr = document.getElementById("pagination_mcr");
+            paginationContainer_mcr.innerHTML = "";
+
+            const totalPages_mcr = Math.ceil(filteredEngagements_mcr.length / rowsPerPage_mcr);
+            const startPage_mcr = Math.max(1, currentPage_mcr - Math.floor(pagesToShow_mcr / 2));
+            const endPage_mcr = Math.min(totalPages_mcr, startPage_mcr + pagesToShow_mcr - 1);
+
+            const firstButton_mcr = document.createElement("button");
+            firstButton_mcr.textContent = "First";
+            firstButton_mcr.addEventListener("click", () => changePage_mcr(1));
+            paginationContainer_mcr.appendChild(firstButton_mcr);
+
+            const prevButton_mcr = document.createElement("button");
+            prevButton_mcr.textContent = "Previous";
+            prevButton_mcr.addEventListener("click", () => changePage_mcr(currentPage_mcr - 1));
+            paginationContainer_mcr.appendChild(prevButton_mcr);
+
+            for (let i_mcr = startPage_mcr; i_mcr <= endPage_mcr; i_mcr++) {
+                let pageButton_mcr = document.createElement("button");
+                pageButton_mcr.textContent = i_mcr;
+                pageButton_mcr.classList.toggle("active", i_mcr === currentPage_mcr);
+                pageButton_mcr.addEventListener("click", () => changePage_mcr(i_mcr));
+                paginationContainer_mcr.appendChild(pageButton_mcr);
+            }
+
+            const nextButton_mcr = document.createElement("button");
+            nextButton_mcr.textContent = "Next";
+            nextButton_mcr.addEventListener("click", () => changePage_mcr(currentPage_mcr + 1));
+            paginationContainer_mcr.appendChild(nextButton_mcr);
+
+            const lastButton_mcr = document.createElement("button");
+            lastButton_mcr.textContent = "Last";
+            lastButton_mcr.addEventListener("click", () => changePage_mcr(totalPages_mcr));
+            paginationContainer_mcr.appendChild(lastButton_mcr);
+        }
+
+        function changePage_mcr(page_mcr) {
+            if (page_mcr < 1) page_mcr = 1;
+            if (page_mcr > Math.ceil(filteredEngagements_mcr.length / rowsPerPage_mcr)) page_mcr = Math.ceil(filteredEngagements_mcr.length / rowsPerPage_mcr);
+            currentPage_mcr = page_mcr;
+            renderTable_mcr();
+        }
+
+        function clearFilters_mcr() {
+            document.getElementById("searchInput_mcr").value = "";
+            document.getElementById("assignedToFilter_mcr").value = "";
+            document.getElementById("versionFilter_mcr").value = "";
+            document.getElementById("statusFilter_mcr").value = "";
+            document.getElementById("showCompleted_mcr").checked = false;
+            document.getElementById("displayAllData_mcr").checked = false;
+            document.getElementById("date1_mcr").value = "";
+            document.getElementById("date2_mcr").value = "";
+            document.getElementById("sortByDate_mcr").checked = false;
+            applyFilters_mcr();
+        }
+
+        // Refresh the table every 1 minute
+        setInterval(() => {
+            loadData_mcr();
+        }, 60000); // Refresh every 1 minute
+
+        async function loadData_mcr() {
+            await fetchEngagements_mcr(currentPage_mcr);
+        }
+
+        // Attach event listener to the refresh button
+        document.getElementById("refreshButton_mcr").addEventListener("click", loadData_mcr);
+
+        document.getElementById("searchInput_mcr").addEventListener("input", applyFilters_mcr);
+        document.getElementById("showCompleted_mcr").addEventListener("change", applyFilters_mcr);
+        document.getElementById("displayAllData_mcr").addEventListener("change", applyFilters_mcr);
+        document.getElementById("assignedToFilter_mcr").addEventListener("change", applyFilters_mcr);
+        document.getElementById("versionFilter_mcr").addEventListener("change", applyFilters_mcr);
+        document.getElementById("statusFilter_mcr").addEventListener("change", applyFilters_mcr);
+        document.getElementById("date1_mcr").addEventListener("change", applyFilters_mcr);
+        document.getElementById("date2_mcr").addEventListener("change", applyFilters_mcr);
+        document.getElementById("sortByDate_mcr").addEventListener("change", applyFilters_mcr);
+        document.getElementById("clearFilters_mcr").addEventListener("click", clearFilters_mcr);
+
+        loadData_mcr();
+
+        // Function to open popup with specified URL
+        function openPopup(engagementId, actionType) {
+            let url = "";
+            let width = "900cm";
+            let height = "900cm";
+
+            if (actionType === "edit") {
+                url = `https://demo.defectdojo.org/engagement/${engagementId}/edit`;
+            } else if (actionType === "close") {
+                url = `https://demo.defectdojo.org/engagement/${engagementId}/close`;
+            } else if (actionType === "feedback") {
+                url = `https://demo.defectdojo.org/engagement/${engagementId}`;
+            }
+
+            window.open(url, "_blank", `width=${width}, height=${height}`);
+        }
+    </script>
+
+</body>
+
+</html>
+
+	</div>
+    <div id="tab2" class="content">
+	<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engagements</title>
+    <!-- Link to FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <!-- Link to Select2 CSS for the searchable multiselect dropdown -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f8f9fa;
+        }
+
+        .filters {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        /* Style the refresh button */
+        #refreshButton_patch {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: #58BCE2;
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 18px;
+            border-radius: 5px;
+        }
+
+        #refreshButton_patch:hover {
+            background-color: #0056b3;
+        }
+
+        table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            white-space: normal;
+            word-wrap: break-word;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        th {
+            background-color: #58BCE2;
+            color: white;
+            cursor: pointer;
+        }
+
+        input,
+        select {
+            padding: 6px;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+        }
+
+        .pagination {
+            margin-top: 10px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .pagination button,
+        .pagination a {
+            padding: 8px 12px;
+            margin: 2px;
+            border: 1px solid #58BCE2;
+            background-color: white;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .pagination button.active,
+        .pagination a.active {
+            background-color: #58BCE2;
+            color: white;
+        }
+
+        .pagination button:hover,
+        .pagination a:hover {
+            background-color: #0056b3;
+            color: white;
+        }
+
+        .action-buttons a {
+            text-decoration: none;
+            padding: 5px 10px;
+            margin: 2px;
+            display: inline-block;
+            background-color: #28a745;
+            color: white;
+            border-radius: 4px;
+        }
+
+        .close-btn {
+            background-color: #dc3545 !important;
+        }
+
+        .count-display {
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .action-buttons i {
+            font-size: 20px;
+            margin: 0 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Refresh Button (Right Top) -->
+    <button id="refreshButton_patch" title="Refresh Data">
+        <i class="fas fa-sync-alt"></i>
+    </button>
+
+    <div class="filters">
+        <input type="text" id="searchInput_patch" placeholder="Search by any column...">
+        <label><input type="checkbox" id="showCompleted_patch"> Show Completed</label>
+        <label><input type="checkbox" id="displayAllData_patch"> Display All Data</label>
+        <label><input type="checkbox" id="sortByDate_patch"> Sort by Latest Start Date</label>
+
+        <!-- Multiselect Dropdown for Engagements -->
+        <select id="engagementNameFilter_patch" style="width: 300px;" class="select2" multiple>
+            <option value="">Filter by Engagement Name</option>
+        </select>
+
+        <select id="assignedToFilter_patch" disabled>
+            <option value="">Filter by Assigned To</option>
+        </select>
+        <select id="versionFilter_patch">
+            <option value="">Filter by Version</option>
+        </select>
+        <select id="statusFilter_patch">
+            <option value="">Filter by Status</option>
+        </select>
+        <input type="date" id="date1_patch" placeholder="Start Date">
+        <input type="date" id="date2_patch" placeholder="End Date">
+        <button id="clearFilters_patch">Clear All Filters</button>
+    </div>
+
+    <div class="count-display">
+        <span id="filteredCount_patch">Total Records: 0</span>
+    </div>
+
+    <table id="engagementTable_patch">
+        <thead>
+            <tr>
+                <th>Added Date</th>
+                <th>Title</th>
+                <th>Version</th>
+                <th>Assigned To</th>
+                <th>AppSec ETA Date</th>
+                <th>RM ETA Date</th>
+                <th>Created By</th>
+                <th>Status</th>
+                <th>Completion Date</th>
+                <th>Notes</th>
+                <th>Comments</th> <!-- Review Column -->
+                <th>Actions</th> <!-- Actions Column -->
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <div class="pagination" id="pagination_patch"></div>
+
+    <!-- Include jQuery before Select2 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+    <script>
+        let engagements_patch = [];
+        let usersMap_patch = new Map();
+        let assignedToSet_patch = new Set();
+        let versionSet_patch = new Set();
+        let statusSet_patch = new Set();
+        let filteredEngagements_patch = [];
+        let currentPage_patch = 1;
+        const rowsPerPage_patch = 6;
+        const batchSize_patch = 6;
+        let totalRecords_patch = 0;
+        const pagesToShow_patch = 10;
+        let loggedInUser_patch = {};
+        let loggedInUser_patchId = null;
+
+        // Function to fetch the logged-in user's details from the user_profile endpoint
+        async function fetchloggedInUser_patch() {
+            try {
+                const response_patch = await fetch('https://demo.defectdojo.org/api/v2/user_profile/');
+                const data_patch = await response_patch.json();
+                if (data_patch.user) {
+                    loggedInUser_patch = data_patch.user;
+                    loggedInUser_patchId = loggedInUser_patch.id; // Save the logged-in user's ID
+                } else {
+                    console.error('Logged-in user not found.');
+                }
+            } catch (error_patch) {
+                console.error('Error fetching logged-in user:', error_patch);
+            }
+        }
+
+        // Fetch all engagements assigned to the logged-in user
+        async function fetchEngagements_patch(page_patch = 1) {
+            try {
+                // First, fetch all engagements assigned to the logged-in user
+                const response_patch = await fetch(`https://demo.defectdojo.org/api/v2/engagements?limit=${batchSize_patch}&offset=${(page_patch - 1) * batchSize_patch}&ordering=-target_start`);
+                const data_patch = await response_patch.json();
+                
+                totalRecords_patch = data_patch.count;
+                engagements_patch = data_patch.results;
+
+                // Populate the engagement name filter dropdown
+                populateEngagementNameFilter_patch();
+
+                // Fetch all tests associated with each engagement
+                let allTests_patch = [];
+                const selectedEngagementIds = $('#engagementNameFilter_patch').val(); // Get selected engagement IDs
+                for (let engagementId of selectedEngagementIds) {
+                    const testsResponse_patch = await fetch(`https://demo.defectdojo.org/api/v2/tests/?engagement=${engagementId}`);
+                    const testsData_patch = await testsResponse_patch.json();
+                    allTests_patch.push(...testsData_patch.results);
+                }
+
+                // Apply the filters to the tests
+                applyFilters_patch(allTests_patch);
+            } catch (error_patch) {
+                console.error('Error fetching engagements:', error_patch);
+            }
+        }
+
+        // Populate the Engagement Name dropdown (Searchable, Multiselect)
+        function populateEngagementNameFilter_patch() {
+            const engagementNameDropdown_patch = document.getElementById("engagementNameFilter_patch");
+            engagementNameDropdown_patch.innerHTML = '<option value="">Filter by Engagement Name</option>';
+            
+            engagements_patch.forEach(engagement_patch => {
+                let option_patch = document.createElement("option");
+                option_patch.value = engagement_patch.id;
+                option_patch.textContent = engagement_patch.name;
+                engagementNameDropdown_patch.appendChild(option_patch);
+            });
+
+            // Initialize Select2 for the dropdown to make it searchable and allow multiple selections
+            $('#engagementNameFilter_patch').select2();
+
+            // Select all by default
+            $('#engagementNameFilter_patch').val(engagements_patch.map(engagement => engagement.id)).trigger('change');
+        }
+
+        // Fetch user details by ID
+        async function fetchUserById_patch(userId_patch) {
+            if (!userId_patch) return "Not Assigned";
+            try {
+                const response_patch = await fetch(`https://demo.defectdojo.org/api/v2/users/?id=${userId_patch}`);
+                const data_patch = await response_patch.json();
+                if (data_patch.count > 0) {
+                    const user_patch = data_patch.results[0];
+                    return `${user_patch.first_name || ''} ${user_patch.last_name || ''}`.trim() || "Not Assigned";
+                }
+                return "Not Assigned";
+            } catch (error_patch) {
+                console.error(`Error fetching user ${userId_patch}:`, error_patch);
+                return "Not Assigned";
+            }
+        }
+
+        // Apply filters on the tests data
+        function applyFilters_patch(allTests_patch) {
+            const showCompleted_patch = document.getElementById("showCompleted_patch").checked;
+            const displayAllData_patch = document.getElementById("displayAllData_patch").checked;
+            const searchTerm_patch = document.getElementById("searchInput_patch").value.toLowerCase();
+            const selectedAssignedTo_patch = document.getElementById("assignedToFilter_patch").value;
+            const selectedVersion_patch = document.getElementById("versionFilter_patch").value;
+            const selectedStatus_patch = document.getElementById("statusFilter_patch").value;
+            const date1_patch = document.getElementById("date1_patch").value;
+            const date2_patch = document.getElementById("date2_patch").value;
+
+            let startDate = date1_patch ? new Date(date1_patch) : null;
+            let endDate = date2_patch ? new Date(date2_patch) : null;
+
+            if (startDate) {
+                startDate.setHours(0, 0, 0, 0);
+            }
+            if (endDate) {
+                endDate.setHours(23, 59, 59, 999);
+            }
+
+            filteredEngagements_patch = allTests_patch.filter(test_patch => {
+                const matchesStatus_patch =
+                    (showCompleted_patch && test_patch.status === "Completed") ||
+                    (displayAllData_patch) ||
+                    (!showCompleted_patch && !displayAllData_patch && ["Not Started", "On Hold", "In Progress"].includes(test_patch.status));
+
+                const assignedToName_patch = usersMap_patch.get(test_patch.lead) || "Not Assigned";
+                const matchesSearch_patch =
+                    (test_patch.title && test_patch.title.toLowerCase().includes(searchTerm_patch)) ||
+                    (test_patch.description && test_patch.description.toLowerCase().includes(searchTerm_patch)) ||
+                    (test_patch.status && test_patch.status.toLowerCase().includes(searchTerm_patch)) ||
+                    (assignedToName_patch && assignedToName_patch.toLowerCase().includes(searchTerm_patch));
+
+                const matchesAssignedTo_patch = !selectedAssignedTo_patch || (assignedToName_patch === selectedAssignedTo_patch);
+                const matchesVersion_patch = !selectedVersion_patch || (test_patch.version === selectedVersion_patch);
+                const matchesStatusFilter_patch = !selectedStatus_patch || (test_patch.status === selectedStatus_patch);
+
+                let matchesDateRange_patch = true;
+
+                const testDate = new Date(test_patch.updated);
+                if (startDate) {
+                    matchesDateRange_patch = matchesDateRange_patch && testDate >= startDate;
+                }
+                if (endDate) {
+                    matchesDateRange_patch = matchesDateRange_patch && testDate <= endDate;
+                }
+
+                return matchesStatus_patch && matchesSearch_patch && matchesAssignedTo_patch && matchesVersion_patch && matchesStatusFilter_patch && matchesDateRange_patch;
+            });
+
+            updateFilteredCount_patch();
+            renderTable_patch();
+        }
+
+        // Update filtered count
+        function updateFilteredCount_patch() {
+            document.getElementById("filteredCount_patch").textContent = `Total Records: ${filteredEngagements_patch.length}`;
+        }
+
+        // Render table
+        async function renderTable_patch() {
+            const tableBody_patch = document.querySelector("#engagementTable_patch tbody");
+            tableBody_patch.innerHTML = "";
+
+            let start_patch = (currentPage_patch - 1) * rowsPerPage_patch;
+            let end_patch = start_patch + rowsPerPage_patch;
+            let paginatedItems_patch = filteredEngagements_patch.slice(start_patch, end_patch);
+
+            for (let test_patch of paginatedItems_patch) {
+                // Fetch the first_name and last_name for the assigned user (lead)
+                let assignedToName_patch = await fetchUserById_patch(test_patch.lead);
+                let updatedDate_patch = new Date(test_patch.updated).toISOString().split('T')[0];
+
+                // Format notes
+                let notes_patch = test_patch.notes.map(note => {
+                    const noteDate_patch = new Date(note.date).toISOString().split('T')[0];
+                    return `
+                        <strong>${note.author.first_name} ${note.author.last_name}</strong> <br>
+                        <i>${note.entry}</i> <br>
+                        <small>${noteDate_patch}</small><br><br>
+                    `;
+                }).join("");
+
+                let row_patch = `
+                    <tr>
+                        <td>${test_patch.created || "-"}</td>
+                        <td>${test_patch.title || "-"}</td>
+                        <td>${test_patch.test_type_name || "-"}</td>
+                        <td>${assignedToName_patch}</td>
+                        <td>${test_patch.target_start || "-"}</td>
+                        <td>${test_patch.target_end || "-"}</td>
+                        <td>${test_patch.scan_type || "-"}</td>
+                        <td>${test_patch.status || "-"}</td>
+                        <td>${updatedDate_patch || "-"}</td>
+                        <td>${test_patch.description || "-"}</td>
+                        <td>${notes_patch || "No Notes"}</td>
+                        <td class="action-buttons">
+                            <a href="javascript:void(0);" class="close-btn" onclick="openPopup('${test_patch.id}', 'edit')"><i class="fas fa-edit"></i> Edit</a>
+                            <a href="javascript:void(0);" class="close-btn" onclick="openPopup('${test_patch.id}', 'close')"><i class="fas fa-tasks"></i> Close</a>
+                        </td>
+                    </tr>
+                `;
+                tableBody_patch.innerHTML += row_patch;
+            }
+
+            renderPagination_patch();
+        }
+
+        // Render pagination
+        function renderPagination_patch() {
+            const paginationContainer_patch = document.getElementById("pagination_patch");
+            paginationContainer_patch.innerHTML = "";
+
+            const totalPages_patch = Math.ceil(filteredEngagements_patch.length / rowsPerPage_patch);
+            const startPage_patch = Math.max(1, currentPage_patch - Math.floor(pagesToShow_patch / 2));
+            const endPage_patch = Math.min(totalPages_patch, startPage_patch + pagesToShow_patch - 1);
+
+            const firstButton_patch = document.createElement("button");
+            firstButton_patch.textContent = "First";
+            firstButton_patch.addEventListener("click", () => changePage_patch(1));
+            paginationContainer_patch.appendChild(firstButton_patch);
+
+            const prevButton_patch = document.createElement("button");
+            prevButton_patch.textContent = "Previous";
+            prevButton_patch.addEventListener("click", () => changePage_patch(currentPage_patch - 1));
+            paginationContainer_patch.appendChild(prevButton_patch);
+
+            for (let i_patch = startPage_patch; i_patch <= endPage_patch; i_patch++) {
+                let pageButton_patch = document.createElement("button");
+                pageButton_patch.textContent = i_patch;
+                pageButton_patch.classList.toggle("active", i_patch === currentPage_patch);
+                pageButton_patch.addEventListener("click", () => changePage_patch(i_patch));
+                paginationContainer_patch.appendChild(pageButton_patch);
+            }
+
+            const nextButton_patch = document.createElement("button");
+            nextButton_patch.textContent = "Next";
+            nextButton_patch.addEventListener("click", () => changePage_patch(currentPage_patch + 1));
+            paginationContainer_patch.appendChild(nextButton_patch);
+
+            const lastButton_patch = document.createElement("button");
+            lastButton_patch.textContent = "Last";
+            lastButton_patch.addEventListener("click", () => changePage_patch(totalPages_patch));
+            paginationContainer_patch.appendChild(lastButton_patch);
+        }
+
+        function changePage_patch(page_patch) {
+            if (page_patch < 1) page_patch = 1;
+            if (page_patch > Math.ceil(filteredEngagements_patch.length / rowsPerPage_patch)) page_patch = Math.ceil(filteredEngagements_patch.length / rowsPerPage_patch);
+            currentPage_patch = page_patch;
+            renderTable_patch();
+        }
+
+        // Refresh the table every 1 minute
+        setInterval(() => {
+            loadData_patch();
+        }, 60000); // Refresh every 1 minute
+
+        async function loadData_patch() {
+            await fetchEngagements_patch(currentPage_patch);
+        }
+
+        // Attach event listener to the refresh button
+        document.getElementById("refreshButton_patch").addEventListener("click", loadData_patch);
+
+        document.getElementById("searchInput_patch").addEventListener("input", () => applyFilters_patch(filteredEngagements_patch));
+        document.getElementById("showCompleted_patch").addEventListener("change", () => applyFilters_patch(filteredEngagements_patch));
+        document.getElementById("displayAllData_patch").addEventListener("change", () => applyFilters_patch(filteredEngagements_patch));
+        document.getElementById("assignedToFilter_patch").addEventListener("change", () => applyFilters_patch(filteredEngagements_patch));
+        document.getElementById("versionFilter_patch").addEventListener("change", () => applyFilters_patch(filteredEngagements_patch));
+        document.getElementById("statusFilter_patch").addEventListener("change", () => applyFilters_patch(filteredEngagements_patch));
+        document.getElementById("date1_patch").addEventListener("change", () => applyFilters_patch(filteredEngagements_patch));
+        document.getElementById("date2_patch").addEventListener("change", () => applyFilters_patch(filteredEngagements_patch));
+        document.getElementById("sortByDate_patch").addEventListener("change", () => applyFilters_patch(filteredEngagements_patch));
+        document.getElementById("clearFilters_patch").addEventListener("click", () => applyFilters_patch(filteredEngagements_patch));
+
+        loadData_patch();
+
+        // Function to open popup with specified URL
+        function openPopup(testId, actionType) {
+            let url = "";
+            let width = "900cm";
+            let height = "900cm";
+
+            if (actionType === "edit") {
+                url = `https://demo.defectdojo.org/test/${testId}/edit`;
+            } else if (actionType === "close") {
+                url = `https://demo.defectdojo.org/test/${testId}/close`;
+            } else if (actionType === "feedback") {
+                url = `https://demo.defectdojo.org/test/${testId}`;
+            }
+
+            window.open(url, "_blank", `width=${width}, height=${height}`);
+        }
+    </script>
+
+</body>
+
+</html>
+
+	
+	</div>
+    <div id="tab3" class="content">Content for Tab 3</div>
+    <div id="tab4" class="content">Content for Tab 4</div>
+    <div id="tab5" class="content">Content for Tab 5</div>
+    <div id="tab6" class="content">Content for Tab 6</div>
+    <div id="tab7" class="content">Content for Tab 7</div>
+    
+    <script>
+        function switchTab(event, tabId) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.querySelectorAll('.content').forEach(content => content.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+        }
+    </script>
+</body>
+</html>
