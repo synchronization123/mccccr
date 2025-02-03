@@ -43,7 +43,7 @@ def fetch_all_dependency_data():
 
     return all_data
 
-def fetch_findings_for_uuid(uuid):
+def fetch_findings_for_uuid(uuid, project_name):
     """Fetch findings for a specific UUID."""
     url = f"{FINDINGS_API_URL}/{uuid}"
     try:
@@ -51,31 +51,53 @@ def fetch_findings_for_uuid(uuid):
         response.raise_for_status()
         data = response.json()
 
+        # If no data found, create a blank Excel with headers
         if not data:
             print(f"No findings for UUID: {uuid}. Saving blank Excel.")
-            # Create blank Excel file with headers if no data
-            df = pd.DataFrame(columns=["Finding", "Severity", "Description"])  # Example headers
-            df.to_excel(f"DTResult_{uuid}.xlsx", index=False)
-            print(f"Blank Excel file created for UUID: {uuid}")
+            df = pd.DataFrame(columns=["Finding", "Severity", "Description", "analysis.state"])  # Example headers
+            df.to_excel(f"{project_name}.xlsx", index=False)
+            print(f"Blank Excel file created for UUID: {uuid} with name {project_name}.xlsx")
+            return "Analysis Pending"
         else:
             # Convert findings data to a DataFrame and save to Excel
             df = pd.json_normalize(data)
-            df.to_excel(f"DTResult_{uuid}.xlsx", index=False)
-            print(f"Data successfully saved for UUID: {uuid}")
+            df.to_excel(f"{project_name}.xlsx", index=False)
+            print(f"Data successfully saved for UUID: {uuid} with name {project_name}.xlsx")
+
+            # Check if 'analysis.state' column exists, else return "Analysis Pending"
+            return df.get('analysis.state', ['Analysis Pending']).iloc[0]  # Default to "Analysis Pending"
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching findings for UUID {uuid}: {e}")
+        return "Analysis Pending"
 
 def main():
     # Fetch all projects to get UUIDs
     all_projects = fetch_all_dependency_data()
 
-    for project in all_projects:
+    # Filter projects where version is 'develop'
+    filtered_projects = [project for project in all_projects if project.get('version') == 'develop']
+
+    print(f"Found {len(filtered_projects)} projects with version 'develop'.")
+
+    # Prepare list to store final data for Count.xlsx
+    final_data = []
+
+    # For each filtered project, fetch findings using UUID
+    for project in filtered_projects:
         uuid = project.get('uuid')
-        if uuid:
-            fetch_findings_for_uuid(uuid)
+        project_name = project.get('name')  # Get project name to use as filename
+        if uuid and project_name:
+            analysis_state = fetch_findings_for_uuid(uuid, project_name)
+            # Append filename (without extension) and analysis.state
+            final_data.append({"Filename": project_name, "analysis.state": analysis_state})
         else:
-            print("UUID not found in project data.")
+            print(f"UUID or Name not found for project: {project}")
+
+    # Save the final data into Count.xlsx
+    final_df = pd.DataFrame(final_data)
+    final_df.to_excel("Count.xlsx", index=False)
+    print("Count.xlsx has been successfully created with filenames and analysis state.")
 
 if __name__ == "__main__":
     main()
