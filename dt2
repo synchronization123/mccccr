@@ -44,7 +44,7 @@ def fetch_all_findings(uuid):
             all_findings.extend(data)  # Append current batch to full list
             print(f"Fetched {len(data)} records from page {page} for UUID {uuid}")
 
-            # If fewer than the limit is returned, it means we've reached the last page
+            # If fewer than 'limit' records are returned, it means it's the last page
             if len(data) < limit:
                 print(f"Last page reached for UUID {uuid}.")
                 break  # Stop if fewer than 'limit' records are returned
