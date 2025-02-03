@@ -65,7 +65,13 @@ def fetch_findings_for_uuid(uuid, project_name):
             print(f"Data successfully saved for UUID: {uuid} with name {project_name}.xlsx")
 
             # Check if 'analysis.state' column exists, else return "Analysis Pending"
-            return df.get('analysis.state', ['Analysis Pending']).iloc[0]  # Default to "Analysis Pending"
+            if 'analysis.state' not in df.columns:
+                # Fill the analysis.state column with "Analysis Pending" for each row
+                df['analysis.state'] = 'Analysis Pending'
+                df.to_excel(f"{project_name}.xlsx", index=False)
+                print(f"Added 'Analysis Pending' to 'analysis.state' column for {project_name}.xlsx")
+                return "Analysis Pending"
+            return df['analysis.state'].iloc[0]  # Return first row's analysis.state value
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching findings for UUID {uuid}: {e}")
@@ -94,8 +100,12 @@ def main():
         else:
             print(f"UUID or Name not found for project: {project}")
 
-    # Save the final data into Count.xlsx
+    # After processing all projects, write final data to Count.xlsx
     final_df = pd.DataFrame(final_data)
+
+    # Ensure any missing 'analysis.state' are marked as "Analysis Pending"
+    final_df['analysis.state'].fillna('Analysis Pending', inplace=True)
+
     final_df.to_excel("Count.xlsx", index=False)
     print("Count.xlsx has been successfully created with filenames and analysis state.")
 
