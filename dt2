@@ -23,12 +23,15 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 REQUIRED_COLUMNS = ["component.project", "analysis.state"]
 
 def fetch_all_findings(uuid):
-    """Fetch all findings for a given project UUID with pagination."""
+    """Fetch all findings for a given project UUID with pagination, avoiding infinite loops."""
     all_findings = []
     page = 1
     limit = 100  # API limit per request
+    max_pages = 100  # Fail-safe: Stop after 100 pages
 
-    while True:
+    last_data_hash = None  # Store hash of last page to detect duplicates
+
+    while page <= max_pages:
         url = f"{BASE_API_URL}/finding/project/{uuid}"
         params = {"page": page, "limit": limit}  # Pagination parameters
 
@@ -38,14 +41,22 @@ def fetch_all_findings(uuid):
             data = response.json()
 
             if not data:
+                print(f"No more data for UUID {uuid}, stopping pagination.")
                 break  # Stop if no more records
 
+            data_hash = hash(str(data))  # Convert data to hash for comparison
+            if data_hash == last_data_hash:
+                print(f"Duplicate data detected for UUID {uuid} on page {page}, stopping pagination.")
+                break  # Stop if duplicate page data is detected
+
+            last_data_hash = data_hash  # Update last data hash
             all_findings.extend(data)  # Append current batch to full list
 
             print(f"Fetched {len(data)} records from page {page} for UUID {uuid}")
 
             if len(data) < limit:
-                break  # Last page reached
+                print(f"Last page reached for UUID {uuid}.")
+                break  # Stop if fewer than 'limit' records are returned
 
             page += 1  # Move to next page
         except requests.exceptions.RequestException as e:
@@ -71,10 +82,8 @@ def process_and_save_findings():
         else:
             df_findings = pd.DataFrame(columns=REQUIRED_COLUMNS)  # Create empty DataFrame with headers
 
-        # Ensure required columns exist
-        for col in REQUIRED_COLUMNS:
-            if col not in df_findings.columns:
-                df_findings[col] = "Analysis Pending"  # Fill missing columns
+        # Ensure only required columns exist
+        df_findings = df_findings[REQUIRED_COLUMNS]
 
         # Fill missing values with 'Analysis Pending'
         df_findings[REQUIRED_COLUMNS] = df_findings[REQUIRED_COLUMNS].fillna("Analysis Pending")
@@ -85,7 +94,7 @@ def process_and_save_findings():
         print(f"Saved findings for UUID {uuid} to {file_path}")
 
 def merge_and_cleanup():
-    """Merge all Excel files in the output folder and delete individual files."""
+    """Merge all Excel files in the output folder (keeping only required columns) and delete individual files."""
     files = glob(os.path.join(OUTPUT_FOLDER, "*.xlsx"))
 
     if not files:
@@ -94,7 +103,7 @@ def merge_and_cleanup():
 
     all_dfs = []
     for file in files:
-        df = pd.read_excel(file)
+        df = pd.read_excel(file, usecols=REQUIRED_COLUMNS)  # Load only required columns
         all_dfs.append(df)
 
     if all_dfs:
