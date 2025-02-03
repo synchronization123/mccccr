@@ -2,7 +2,7 @@ import requests
 import pandas as pd
 
 # API details
-API_URL = "https://dependencytrackapi.crm.com/api/v1/project/jsdjjdjdjd"
+API_URL = "https://dependencytrackapi.crm.com/api/v1/project"
 API_TOKEN = "bzbdbdhdhd"
 HEADERS = {
     "X-Api-Key": API_TOKEN,
@@ -13,11 +13,11 @@ HEADERS = {
 def fetch_all_dependency_data():
     """Fetch all pages of Dependency Track API data."""
     all_data = []
-    offset = 0
-    limit = 100  # Adjust if API allows more per request
+    page = 1
+    limit = 100  # Set the limit per request
 
     while True:
-        params = {"offset": offset, "limit": limit}  # Add pagination parameters
+        params = {"page": page, "limit": limit}  # Add pagination parameters
         try:
             response = requests.get(API_URL, headers=HEADERS, params=params)
             response.raise_for_status()
@@ -28,11 +28,13 @@ def fetch_all_dependency_data():
             
             all_data.extend(data)  # Append current batch to full list
 
-            # Stop if fewer than 'limit' records are returned (no more pages)
+            print(f"Fetched {len(data)} records from page {page}")
+            
+            # Stop if fewer than 'limit' records are returned (last page reached)
             if len(data) < limit:
                 break
 
-            offset += limit  # Move to the next batch
+            page += 1  # Move to the next page
         except requests.exceptions.RequestException as e:
             print(f"Error fetching data: {e}")
             break
@@ -45,7 +47,7 @@ def save_to_excel(data, filename="dependency_track.xlsx"):
         print("No data to save.")
         return
     
-    df = pd.json_normalize(data)  # Flatten nested JSON
+    df = pd.json_normalize(data)  # Flatten nested JSON if needed
     df.to_excel(filename, index=False)
     print(f"Data successfully saved to {filename}")
 
