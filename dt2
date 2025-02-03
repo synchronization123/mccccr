@@ -1,0 +1,54 @@
+import requests
+import pandas as pd
+
+# API details
+API_URL = "https://dependencytrackapi.crm.com/api/v1/project/jsdjjdjdjd"
+API_TOKEN = "bzbdbdhdhd"
+HEADERS = {
+    "X-Api-Key": API_TOKEN,
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+}
+
+def fetch_all_dependency_data():
+    """Fetch all pages of Dependency Track API data."""
+    all_data = []
+    offset = 0
+    limit = 100  # Adjust if API allows more per request
+
+    while True:
+        params = {"offset": offset, "limit": limit}  # Add pagination parameters
+        try:
+            response = requests.get(API_URL, headers=HEADERS, params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            if not data:
+                break  # Stop if no more records
+            
+            all_data.extend(data)  # Append current batch to full list
+
+            # Stop if fewer than 'limit' records are returned (no more pages)
+            if len(data) < limit:
+                break
+
+            offset += limit  # Move to the next batch
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching data: {e}")
+            break
+
+    return all_data
+
+def save_to_excel(data, filename="dependency_track.xlsx"):
+    """Save API response to an Excel file."""
+    if not data:
+        print("No data to save.")
+        return
+    
+    df = pd.json_normalize(data)  # Flatten nested JSON
+    df.to_excel(filename, index=False)
+    print(f"Data successfully saved to {filename}")
+
+if __name__ == "__main__":
+    data = fetch_all_dependency_data()
+    save_to_excel(data)
