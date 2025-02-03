@@ -1,5 +1,7 @@
+import os
 import requests
 import pandas as pd
+from glob import glob
 
 # API details
 BASE_API_URL = "https://dependencytrackapi.crm.com/api/v1"
@@ -11,7 +13,11 @@ HEADERS = {
 }
 
 INPUT_FILE = "dependency_track.xlsx"  # Input Excel file containing UUIDs
-OUTPUT_FILE = "DTResult.xlsx"  # Final Excel file
+OUTPUT_FOLDER = "data/output"  # Folder to store individual Excel files
+FINAL_OUTPUT_FILE = "DTResult.xlsx"  # Merged final Excel file
+
+# Ensure output folder exists
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 def fetch_all_findings(uuid):
     """Fetch all findings for a given project UUID with pagination."""
@@ -46,7 +52,7 @@ def fetch_all_findings(uuid):
     return all_findings
 
 def process_and_save_findings():
-    """Read UUIDs from Excel, fetch findings, filter, and save to Excel."""
+    """Read UUIDs from Excel, fetch findings, filter, and save each to separate Excel files."""
     try:
         # Load UUIDs from the first Excel file
         df_uuids = pd.read_excel(INPUT_FILE, usecols=["uuid"])
@@ -54,31 +60,51 @@ def process_and_save_findings():
         print(f"Error reading UUIDs from Excel: {e}")
         return
 
-    all_results = []
-
     for uuid in df_uuids["uuid"]:
         findings = fetch_all_findings(uuid)
         if not findings:
+            print(f"No data for UUID {uuid}, skipping...")
             continue  # Skip if no data found
         
         df_findings = pd.json_normalize(findings)  # Flatten JSON
 
-        # Keep only 'component.project' and 'analysis.state' columns
+        # Ensure required columns exist
         required_columns = ["component.project", "analysis.state"]
-        df_findings = df_findings[required_columns]
+        for col in required_columns:
+            if col not in df_findings.columns:
+                df_findings[col] = "Analysis Pending"  # Fill missing columns
 
-        # Fill missing values in 'analysis.state' with 'Analysis Pending'
-        df_findings["analysis.state"] = df_findings["analysis.state"].fillna("Analysis Pending")
+        # Fill missing values with 'Analysis Pending'
+        df_findings[required_columns] = df_findings[required_columns].fillna("Analysis Pending")
 
-        all_results.append(df_findings)
+        # Save individual UUID data to an Excel file
+        file_path = os.path.join(OUTPUT_FOLDER, f"{uuid}.xlsx")
+        df_findings.to_excel(file_path, index=False)
+        print(f"Saved findings for UUID {uuid} to {file_path}")
 
-    # Combine all data into a single DataFrame
-    if all_results:
-        final_df = pd.concat(all_results, ignore_index=True)
-        final_df.to_excel(OUTPUT_FILE, index=False)
-        print(f"Filtered findings saved to {OUTPUT_FILE}")
-    else:
-        print("No data found for any UUID.")
+def merge_and_cleanup():
+    """Merge all Excel files in the output folder and delete individual files."""
+    files = glob(os.path.join(OUTPUT_FOLDER, "*.xlsx"))
+
+    if not files:
+        print("No files found to merge.")
+        return
+
+    all_dfs = []
+    for file in files:
+        df = pd.read_excel(file)
+        all_dfs.append(df)
+
+    if all_dfs:
+        merged_df = pd.concat(all_dfs, ignore_index=True)
+        merged_df.to_excel(FINAL_OUTPUT_FILE, index=False)
+        print(f"Merged data saved to {FINAL_OUTPUT_FILE}")
+
+        # Delete individual files
+        for file in files:
+            os.remove(file)
+        print("Deleted individual UUID Excel files.")
 
 if __name__ == "__main__":
     process_and_save_findings()
+    merge_and_cleanup()
