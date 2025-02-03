@@ -54,28 +54,26 @@ def fetch_findings_for_uuid(uuid, project_name):
         # If no data found, create a blank Excel with headers
         if not data:
             print(f"No findings for UUID: {uuid}. Saving blank Excel.")
-            df = pd.DataFrame(columns=["Finding", "Severity", "Description", "analysis.state"])  # Example headers
+            df = pd.DataFrame(columns=["Finding", "Severity", "Description", "analysis.state", "component.name"])  # Example headers
             df.to_excel(f"{project_name}.xlsx", index=False)
             print(f"Blank Excel file created for UUID: {uuid} with name {project_name}.xlsx")
-            return "Analysis Pending"
+            return None
         else:
             # Convert findings data to a DataFrame and save to Excel
             df = pd.json_normalize(data)
             df.to_excel(f"{project_name}.xlsx", index=False)
             print(f"Data successfully saved for UUID: {uuid} with name {project_name}.xlsx")
 
-            # Check if 'analysis.state' column exists, else return "Analysis Pending"
+            # Check if 'analysis.state' column exists, else add "Analysis Pending"
             if 'analysis.state' not in df.columns:
-                # Fill the analysis.state column with "Analysis Pending" for each row
                 df['analysis.state'] = 'Analysis Pending'
                 df.to_excel(f"{project_name}.xlsx", index=False)
                 print(f"Added 'Analysis Pending' to 'analysis.state' column for {project_name}.xlsx")
-                return "Analysis Pending"
-            return df['analysis.state'].iloc[0]  # Return first row's analysis.state value
+            return df
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching findings for UUID {uuid}: {e}")
-        return "Analysis Pending"
+        return None
 
 def main():
     # Fetch all projects to get UUIDs
@@ -94,20 +92,19 @@ def main():
         uuid = project.get('uuid')
         project_name = project.get('name')  # Get project name to use as filename
         if uuid and project_name:
-            analysis_state = fetch_findings_for_uuid(uuid, project_name)
-            # Append filename (without extension) and analysis.state
-            final_data.append({"Filename": project_name, "analysis.state": analysis_state})
-        else:
-            print(f"UUID or Name not found for project: {project}")
+            df = fetch_findings_for_uuid(uuid, project_name)
+            if df is not None:
+                # Extract component.name and analysis.state for each row and add to final data
+                for _, row in df.iterrows():
+                    component_name = row.get('component.name', 'N/A')
+                    analysis_state = row.get('analysis.state', 'Analysis Pending')
+                    final_data.append({"Filename": project_name, "component.name": component_name, "analysis.state": analysis_state})
 
     # After processing all projects, write final data to Count.xlsx
     final_df = pd.DataFrame(final_data)
 
-    # Ensure any missing 'analysis.state' are marked as "Analysis Pending"
-    final_df['analysis.state'].fillna('Analysis Pending', inplace=True)
-
     final_df.to_excel("Count.xlsx", index=False)
-    print("Count.xlsx has been successfully created with filenames and analysis state.")
+    print("Count.xlsx has been successfully created with filenames, component names, and analysis state.")
 
 if __name__ == "__main__":
     main()
