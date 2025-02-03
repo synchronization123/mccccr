@@ -23,7 +23,7 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 REQUIRED_COLUMNS = ["component.project", "analysis.state"]
 
 def fetch_all_findings(uuid):
-    """Fetch all findings for a given project UUID with pagination, avoiding infinite loops."""
+    """Fetch all findings for a given project UUID with pagination."""
     all_findings = []
     page = 1
     limit = 100  # API limit per request
@@ -80,10 +80,14 @@ def process_and_save_findings():
         if findings:
             df_findings = pd.json_normalize(findings)  # Flatten JSON
         else:
-            df_findings = pd.DataFrame(columns=REQUIRED_COLUMNS)  # Create empty DataFrame with headers
+            # Create an empty DataFrame with required columns
+            df_findings = pd.DataFrame(columns=REQUIRED_COLUMNS)  
 
-        # Ensure only required columns exist
-        df_findings = df_findings[REQUIRED_COLUMNS]
+        # Ensure the required columns exist
+        if "component.project" not in df_findings.columns:
+            df_findings["component.project"] = "Analysis Pending"  # Add column if missing
+        if "analysis.state" not in df_findings.columns:
+            df_findings["analysis.state"] = "Analysis Pending"  # Add column if missing
 
         # Fill missing values with 'Analysis Pending'
         df_findings[REQUIRED_COLUMNS] = df_findings[REQUIRED_COLUMNS].fillna("Analysis Pending")
