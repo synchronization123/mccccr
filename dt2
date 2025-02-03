@@ -22,9 +22,12 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 # Required columns
 REQUIRED_COLUMNS = ["component.project", "analysis.state"]
 
-def fetch_all_findings(uuid):
-    """Fetch all findings for a given project UUID with pagination."""
-    all_findings = []
+def fetch_column_count(uuid):
+    """Fetch counts for the 'component.project' and 'analysis.state' columns."""
+    count = {
+        "component.project": 0,
+        "analysis.state": 0
+    }
     page = 1
     limit = 100  # API limit per request
 
@@ -41,7 +44,10 @@ def fetch_all_findings(uuid):
                 print(f"No more data for UUID {uuid}, stopping pagination.")
                 break  # Stop if no more records
 
-            all_findings.extend(data)  # Append current batch to full list
+            # Count occurrences of non-null values in both columns
+            count["component.project"] += sum(1 for item in data if "component.project" in item and item["component.project"] is not None)
+            count["analysis.state"] += sum(1 for item in data if "analysis.state" in item and item["analysis.state"] is not None)
+
             print(f"Fetched {len(data)} records from page {page} for UUID {uuid}")
 
             # If fewer than 'limit' records are returned, it means it's the last page
@@ -54,10 +60,10 @@ def fetch_all_findings(uuid):
             print(f"Error fetching findings for UUID {uuid}: {e}")
             break
 
-    return all_findings
+    return count
 
 def process_and_save_findings():
-    """Read UUIDs from Excel, fetch findings, filter, and save each to separate Excel files."""
+    """Read UUIDs from Excel, fetch counts for columns, and save results to Excel files."""
     try:
         # Load UUIDs from the first Excel file
         df_uuids = pd.read_excel(INPUT_FILE, usecols=["uuid"])
@@ -66,27 +72,27 @@ def process_and_save_findings():
         return
 
     for uuid in df_uuids["uuid"]:
-        findings = fetch_all_findings(uuid)
+        # Get the count of non-null values for each column
+        count = fetch_column_count(uuid)
 
-        if findings:
-            df_findings = pd.json_normalize(findings)  # Flatten JSON
-        else:
-            # Create an empty DataFrame with required columns
-            df_findings = pd.DataFrame(columns=REQUIRED_COLUMNS)  
+        # Create DataFrame with the count results
+        data = {
+            "component.project": [count["component.project"]],
+            "analysis.state": [count["analysis.state"]]
+        }
 
-        # Ensure only required columns exist
-        if "component.project" not in df_findings.columns:
-            df_findings["component.project"] = "Analysis Pending"  # Add column if missing
-        if "analysis.state" not in df_findings.columns:
-            df_findings["analysis.state"] = "Analysis Pending"  # Add column if missing
+        df_count = pd.DataFrame(data)
 
-        # Fill missing values with 'Analysis Pending'
-        df_findings[REQUIRED_COLUMNS] = df_findings[REQUIRED_COLUMNS].fillna("Analysis Pending")
+        # If either column is missing, set its count to the same number as the first column
+        if "component.project" not in df_count.columns:
+            df_count["component.project"] = df_count["analysis.state"]
+        if "analysis.state" not in df_count.columns:
+            df_count["analysis.state"] = df_count["component.project"]
 
         # Save individual UUID data to an Excel file
         file_path = os.path.join(OUTPUT_FOLDER, f"{uuid}.xlsx")
-        df_findings.to_excel(file_path, index=False)
-        print(f"Saved findings for UUID {uuid} to {file_path}")
+        df_count.to_excel(file_path, index=False)
+        print(f"Saved count for UUID {uuid} to {file_path}")
 
 def merge_and_cleanup():
     """Merge all Excel files in the output folder (keeping only required columns) and delete individual files."""
