@@ -2,7 +2,7 @@ import requests
 import pandas as pd
 
 # API details
-API_URL = "https://dependencytrackapi.crm.com/api/v1/project"
+BASE_API_URL = "https://dependencytrackapi.crm.com/api/v1"
 API_TOKEN = "bzbdbdhdhd"
 HEADERS = {
     "X-Api-Key": API_TOKEN,
@@ -10,25 +10,30 @@ HEADERS = {
     "Accept": "application/json"
 }
 
-def fetch_all_dependency_data():
-    """Fetch all pages of Dependency Track API data."""
-    all_data = []
+INPUT_FILE = "dependency_track.xlsx"  # First Excel file containing UUIDs
+OUTPUT_FILE = "DTResult.xlsx"  # Final filtered result file
+
+def fetch_all_findings(uuid):
+    """Fetch all pages of findings for a given project UUID."""
+    all_findings = []
     page = 1
     limit = 100  # Number of records per request
 
     while True:
+        url = f"{BASE_API_URL}/finding/project/{uuid}"
         params = {"page": page, "limit": limit}  # Pagination parameters
+        
         try:
-            response = requests.get(API_URL, headers=HEADERS, params=params)
+            response = requests.get(url, headers=HEADERS, params=params)
             response.raise_for_status()
             data = response.json()
 
             if not data:
                 break  # Stop if no more records
-            
-            all_data.extend(data)  # Append current batch to full list
 
-            print(f"Fetched {len(data)} records from page {page}")
+            all_findings.extend(data)  # Append current batch to full list
+
+            print(f"Fetched {len(data)} records from page {page} for UUID {uuid}")
 
             # Stop if fewer than 'limit' records are returned (last page)
             if len(data) < limit:
@@ -36,38 +41,37 @@ def fetch_all_dependency_data():
 
             page += 1  # Move to next page
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching data: {e}")
+            print(f"Error fetching findings for UUID {uuid}: {e}")
             break
 
-    return all_data
+    return all_findings
 
-def process_data(data):
-    """Filter and clean data to keep only relevant columns."""
-    if not data:
-        print("No data to process.")
-        return None
+def process_and_save_findings():
+    """Read UUIDs from Excel, fetch findings, filter, and save to Excel."""
+    # Load UUIDs from the first Excel file
+    df_uuids = pd.read_excel(INPUT_FILE, usecols=["uuid"])
+    all_results = []
 
-    df = pd.json_normalize(data)  # Flatten JSON if needed
+    for uuid in df_uuids["uuid"]:
+        findings = fetch_all_findings(uuid)
+        if not findings:
+            continue  # Skip if no data found
+        
+        df_findings = pd.json_normalize(findings)  # Flatten JSON
 
-    # Keep only 'name', 'version', 'uuid' columns
-    required_columns = ["name", "version", "uuid"]
-    df = df[required_columns]
+        # Keep only 'component.project' and 'analysis.state' columns
+        required_columns = ["component.project", "analysis.state"]
+        df_findings = df_findings[required_columns]
 
-    # Filter rows where 'version' is 'develop'
-    df = df[df["version"] == "develop"]
+        all_results.append(df_findings)
 
-    return df
-
-def save_to_excel(df, filename="dependency_track.xlsx"):
-    """Save processed data to an Excel file."""
-    if df is None or df.empty:
-        print("No data to save after filtering.")
-        return
-    
-    df.to_excel(filename, index=False)
-    print(f"Filtered data successfully saved to {filename}")
+    # Combine all data into a single DataFrame
+    if all_results:
+        final_df = pd.concat(all_results, ignore_index=True)
+        final_df.to_excel(OUTPUT_FILE, index=False)
+        print(f"Filtered findings saved to {OUTPUT_FILE}")
+    else:
+        print("No data found for any UUID.")
 
 if __name__ == "__main__":
-    raw_data = fetch_all_dependency_data()
-    filtered_df = process_data(raw_data)
-    save_to_excel(filtered_df)
+    process_and_save_findings()
