@@ -1,10 +1,10 @@
-import os
 import requests
 import pandas as pd
-from glob import glob
+import os
 
 # API details
-BASE_API_URL = "https://dependencytrackapi.crm.com/api/v1"
+API_URL = "https://dependencytrackapi.crm.com/api/v1/project"
+FINDINGS_API_URL = "https://dependencytrackapi.crm.com/api/v1/finding/project"
 API_TOKEN = "bzbdbdhdhd"
 HEADERS = {
     "X-Api-Key": API_TOKEN,
@@ -12,115 +12,70 @@ HEADERS = {
     "Accept": "application/json"
 }
 
-INPUT_FILE = "dependency_track.xlsx"  # Input Excel file containing UUIDs
-OUTPUT_FOLDER = "data/output"  # Folder to store individual Excel files
-FINAL_OUTPUT_FILE = "DTResult.xlsx"  # Merged final Excel file
-
-# Ensure output folder exists
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-
-# Required columns
-REQUIRED_COLUMNS = ["component.project", "analysis.state"]
-
-def fetch_column_count(uuid):
-    """Fetch counts for the 'component.project' and 'analysis.state' columns."""
-    count = {
-        "component.project": 0,
-        "analysis.state": 0
-    }
+def fetch_all_dependency_data():
+    """Fetch all pages of Dependency Track API data."""
+    all_data = []
     page = 1
-    limit = 100  # API limit per request
+    limit = 100  # Number of records per request
 
     while True:
-        url = f"{BASE_API_URL}/finding/project/{uuid}"
         params = {"page": page, "limit": limit}  # Pagination parameters
-
         try:
-            response = requests.get(url, headers=HEADERS, params=params)
+            response = requests.get(API_URL, headers=HEADERS, params=params)
             response.raise_for_status()
             data = response.json()
 
             if not data:
-                print(f"UUID: {uuid}: 0 (Pending: 0)")
-                break  # No data found, print and stop
+                break  # Stop if no more records
+            
+            all_data.extend(data)  # Append current batch to full list
 
-            # Count occurrences of non-null values in both columns
-            count["component.project"] += sum(1 for item in data if "component.project" in item and item["component.project"] is not None)
-            count["analysis.state"] += sum(1 for item in data if "analysis.state" in item and item["analysis.state"] is not None)
+            print(f"Fetched {len(data)} records from page {page}")
 
-            print(f"UUID: {uuid}: {count['component.project']} (Pending: {count['analysis.state']})")
-
-            # If fewer than 'limit' records are returned, it means it's the last page
+            # Stop if fewer than 'limit' records are returned (last page)
             if len(data) < limit:
-                print(f"Last page reached for UUID {uuid}.")
-                break  # Stop if fewer than 'limit' records are returned
+                break
 
             page += 1  # Move to next page
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching findings for UUID {uuid}: {e}")
+            print(f"Error fetching data: {e}")
             break
 
-    # If analysis.state column is missing, set it to 0
-    if count["analysis.state"] == 0:
-        count["analysis.state"] = 0  # Missing data in `analysis.state`
+    return all_data
 
-    return count
-
-def process_and_save_findings():
-    """Read UUIDs from Excel, fetch counts for columns, and save results to Excel files."""
+def fetch_findings_for_uuid(uuid):
+    """Fetch findings for a specific UUID."""
+    url = f"{FINDINGS_API_URL}/{uuid}"
     try:
-        # Load UUIDs from the first Excel file
-        df_uuids = pd.read_excel(INPUT_FILE, usecols=["uuid"])
-    except Exception as e:
-        print(f"Error reading UUIDs from Excel: {e}")
-        return
+        response = requests.get(url, headers=HEADERS)
+        response.raise_for_status()
+        data = response.json()
 
-    for uuid in df_uuids["uuid"]:
-        # Get the count of non-null values for each column
-        count = fetch_column_count(uuid)
+        if not data:
+            print(f"No findings for UUID: {uuid}. Saving blank Excel.")
+            # Create blank Excel file with headers if no data
+            df = pd.DataFrame(columns=["Finding", "Severity", "Description"])  # Example headers
+            df.to_excel(f"DTResult_{uuid}.xlsx", index=False)
+            print(f"Blank Excel file created for UUID: {uuid}")
+        else:
+            # Convert findings data to a DataFrame and save to Excel
+            df = pd.json_normalize(data)
+            df.to_excel(f"DTResult_{uuid}.xlsx", index=False)
+            print(f"Data successfully saved for UUID: {uuid}")
 
-        # Create DataFrame with the count results
-        data = {
-            "component.project": [count["component.project"]],
-            "analysis.state": [count["analysis.state"]]
-        }
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching findings for UUID {uuid}: {e}")
 
-        df_count = pd.DataFrame(data)
+def main():
+    # Fetch all projects to get UUIDs
+    all_projects = fetch_all_dependency_data()
 
-        # If either column is missing, set its count to the same number as the first column
-        if "component.project" not in df_count.columns:
-            df_count["component.project"] = df_count["analysis.state"]
-        if "analysis.state" not in df_count.columns:
-            df_count["analysis.state"] = df_count["component.project"]
-
-        # Save individual UUID data to an Excel file
-        file_path = os.path.join(OUTPUT_FOLDER, f"{uuid}.xlsx")
-        df_count.to_excel(file_path, index=False)
-        print(f"Saved count for UUID {uuid} to {file_path}")
-
-def merge_and_cleanup():
-    """Merge all Excel files in the output folder (keeping only required columns) and delete individual files."""
-    files = glob(os.path.join(OUTPUT_FOLDER, "*.xlsx"))
-
-    if not files:
-        print("No files found to merge.")
-        return
-
-    all_dfs = []
-    for file in files:
-        df = pd.read_excel(file, usecols=REQUIRED_COLUMNS)  # Load only required columns
-        all_dfs.append(df)
-
-    if all_dfs:
-        merged_df = pd.concat(all_dfs, ignore_index=True)
-        merged_df.to_excel(FINAL_OUTPUT_FILE, index=False)
-        print(f"Merged data saved to {FINAL_OUTPUT_FILE}")
-
-        # Delete individual files
-        for file in files:
-            os.remove(file)
-        print("Deleted individual UUID Excel files.")
+    for project in all_projects:
+        uuid = project.get('uuid')
+        if uuid:
+            fetch_findings_for_uuid(uuid)
+        else:
+            print("UUID not found in project data.")
 
 if __name__ == "__main__":
-    process_and_save_findings()
-    merge_and_cleanup()
+    main()
