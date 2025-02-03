@@ -41,14 +41,14 @@ def fetch_column_count(uuid):
             data = response.json()
 
             if not data:
-                print(f"No more data for UUID {uuid}, stopping pagination.")
-                break  # Stop if no more records
+                print(f"UUID: {uuid}: 0 (Pending: 0)")
+                break  # No data found, print and stop
 
             # Count occurrences of non-null values in both columns
             count["component.project"] += sum(1 for item in data if "component.project" in item and item["component.project"] is not None)
             count["analysis.state"] += sum(1 for item in data if "analysis.state" in item and item["analysis.state"] is not None)
 
-            print(f"Fetched {len(data)} records from page {page} for UUID {uuid}")
+            print(f"UUID: {uuid}: {count['component.project']} (Pending: {count['analysis.state']})")
 
             # If fewer than 'limit' records are returned, it means it's the last page
             if len(data) < limit:
@@ -59,6 +59,10 @@ def fetch_column_count(uuid):
         except requests.exceptions.RequestException as e:
             print(f"Error fetching findings for UUID {uuid}: {e}")
             break
+
+    # If analysis.state column is missing, set it to 0
+    if count["analysis.state"] == 0:
+        count["analysis.state"] = 0  # Missing data in `analysis.state`
 
     return count
 
