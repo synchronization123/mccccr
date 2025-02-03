@@ -27,9 +27,8 @@ def fetch_all_findings(uuid):
     all_findings = []
     page = 1
     limit = 100  # API limit per request
-    max_pages = 100  # Fail-safe: Stop after 100 pages
 
-    while page <= max_pages:
+    while True:
         url = f"{BASE_API_URL}/finding/project/{uuid}"
         params = {"page": page, "limit": limit}  # Pagination parameters
 
@@ -43,9 +42,9 @@ def fetch_all_findings(uuid):
                 break  # Stop if no more records
 
             all_findings.extend(data)  # Append current batch to full list
-
             print(f"Fetched {len(data)} records from page {page} for UUID {uuid}")
 
+            # If fewer than the limit is returned, it means we've reached the last page
             if len(data) < limit:
                 print(f"Last page reached for UUID {uuid}.")
                 break  # Stop if fewer than 'limit' records are returned
@@ -68,7 +67,7 @@ def process_and_save_findings():
 
     for uuid in df_uuids["uuid"]:
         findings = fetch_all_findings(uuid)
-        
+
         if findings:
             df_findings = pd.json_normalize(findings)  # Flatten JSON
         else:
