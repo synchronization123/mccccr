@@ -14,10 +14,10 @@ def fetch_all_dependency_data():
     """Fetch all pages of Dependency Track API data."""
     all_data = []
     page = 1
-    limit = 100  # Set the limit per request
+    limit = 100  # Number of records per request
 
     while True:
-        params = {"page": page, "limit": limit}  # Add pagination parameters
+        params = {"page": page, "limit": limit}  # Pagination parameters
         try:
             response = requests.get(API_URL, headers=HEADERS, params=params)
             response.raise_for_status()
@@ -29,28 +29,45 @@ def fetch_all_dependency_data():
             all_data.extend(data)  # Append current batch to full list
 
             print(f"Fetched {len(data)} records from page {page}")
-            
-            # Stop if fewer than 'limit' records are returned (last page reached)
+
+            # Stop if fewer than 'limit' records are returned (last page)
             if len(data) < limit:
                 break
 
-            page += 1  # Move to the next page
+            page += 1  # Move to next page
         except requests.exceptions.RequestException as e:
             print(f"Error fetching data: {e}")
             break
 
     return all_data
 
-def save_to_excel(data, filename="dependency_track.xlsx"):
-    """Save API response to an Excel file."""
+def process_data(data):
+    """Filter and clean data to keep only relevant columns."""
     if not data:
-        print("No data to save.")
+        print("No data to process.")
+        return None
+
+    df = pd.json_normalize(data)  # Flatten JSON if needed
+
+    # Keep only 'name', 'version', 'uuid' columns
+    required_columns = ["name", "version", "uuid"]
+    df = df[required_columns]
+
+    # Filter rows where 'version' is 'develop'
+    df = df[df["version"] == "develop"]
+
+    return df
+
+def save_to_excel(df, filename="dependency_track.xlsx"):
+    """Save processed data to an Excel file."""
+    if df is None or df.empty:
+        print("No data to save after filtering.")
         return
     
-    df = pd.json_normalize(data)  # Flatten nested JSON if needed
     df.to_excel(filename, index=False)
-    print(f"Data successfully saved to {filename}")
+    print(f"Filtered data successfully saved to {filename}")
 
 if __name__ == "__main__":
-    data = fetch_all_dependency_data()
-    save_to_excel(data)
+    raw_data = fetch_all_dependency_data()
+    filtered_df = process_data(raw_data)
+    save_to_excel(filtered_df)
