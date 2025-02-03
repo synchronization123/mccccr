@@ -19,6 +19,9 @@ FINAL_OUTPUT_FILE = "DTResult.xlsx"  # Merged final Excel file
 # Ensure output folder exists
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+# Required columns
+REQUIRED_COLUMNS = ["component.project", "analysis.state"]
+
 def fetch_all_findings(uuid):
     """Fetch all findings for a given project UUID with pagination."""
     all_findings = []
@@ -62,20 +65,19 @@ def process_and_save_findings():
 
     for uuid in df_uuids["uuid"]:
         findings = fetch_all_findings(uuid)
-        if not findings:
-            print(f"No data for UUID {uuid}, skipping...")
-            continue  # Skip if no data found
         
-        df_findings = pd.json_normalize(findings)  # Flatten JSON
+        if findings:
+            df_findings = pd.json_normalize(findings)  # Flatten JSON
+        else:
+            df_findings = pd.DataFrame(columns=REQUIRED_COLUMNS)  # Create empty DataFrame with headers
 
         # Ensure required columns exist
-        required_columns = ["component.project", "analysis.state"]
-        for col in required_columns:
+        for col in REQUIRED_COLUMNS:
             if col not in df_findings.columns:
                 df_findings[col] = "Analysis Pending"  # Fill missing columns
 
         # Fill missing values with 'Analysis Pending'
-        df_findings[required_columns] = df_findings[required_columns].fillna("Analysis Pending")
+        df_findings[REQUIRED_COLUMNS] = df_findings[REQUIRED_COLUMNS].fillna("Analysis Pending")
 
         # Save individual UUID data to an Excel file
         file_path = os.path.join(OUTPUT_FOLDER, f"{uuid}.xlsx")
