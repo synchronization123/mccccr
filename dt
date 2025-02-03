@@ -1,5 +1,4 @@
 import requests
-import pandas as pd
 
 # API details
 API_URL = "https://dependencytrackapi.crm.com/api/v1/project/jsdjjdjdjd"
@@ -12,22 +11,14 @@ HEADERS = {
 def fetch_dependency_data():
     try:
         response = requests.get(API_URL, headers=HEADERS)
-        response.raise_for_status()  # Raise an error for non-200 status codes
+        print(f"Response Status: {response.status_code}")
+        print(f"Response Headers: {response.headers}")
+        print(f"Response Body: {response.text}")  # Print full API response for debugging
+
+        response.raise_for_status()  # Raises error for 4xx and 5xx status codes
         return response.json()
     except requests.exceptions.RequestException as e:
         print(f"Error fetching data: {e}")
         return None
 
-def save_to_excel(data, filename="dependency_track.xlsx"):
-    if not data:
-        print("No data to save.")
-        return
-    
-    # Convert JSON response to DataFrame
-    df = pd.json_normalize(data)  # Flatten nested JSON if needed
-    df.to_excel(filename, index=False)
-    print(f"Data saved to {filename}")
-
-if __name__ == "__main__":
-    data = fetch_dependency_data()
-    save_to_excel(data)
+data = fetch_dependency_data()
