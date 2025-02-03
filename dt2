@@ -55,25 +55,61 @@ def fetch_findings_for_uuid(uuid, project_name):
         if not data:
             print(f"No findings for UUID: {uuid}. Saving blank Excel.")
             df = pd.DataFrame(columns=["Finding", "Severity", "Description", "analysis.state", "component.name"])  # Example headers
-            df.to_excel(f"{project_name}.xlsx", index=False)
+            df.to_excel(f"data/{project_name}.xlsx", index=False)
             print(f"Blank Excel file created for UUID: {uuid} with name {project_name}.xlsx")
             return None
         else:
             # Convert findings data to a DataFrame and save to Excel
             df = pd.json_normalize(data)
-            df.to_excel(f"{project_name}.xlsx", index=False)
+            df.to_excel(f"data/{project_name}.xlsx", index=False)
             print(f"Data successfully saved for UUID: {uuid} with name {project_name}.xlsx")
 
             # Check if 'analysis.state' column exists, else add "Analysis Pending"
             if 'analysis.state' not in df.columns:
                 df['analysis.state'] = 'Analysis Pending'
-                df.to_excel(f"{project_name}.xlsx", index=False)
+                df.to_excel(f"data/{project_name}.xlsx", index=False)
                 print(f"Added 'Analysis Pending' to 'analysis.state' column for {project_name}.xlsx")
             return df
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching findings for UUID {uuid}: {e}")
         return None
+
+def generate_count_excel(final_data):
+    """Generate Count.xlsx with Filename, component.name, analysis.state."""
+    # Fill any missing 'analysis.state' with 'Analysis Pending'
+    final_df = pd.DataFrame(final_data)
+    final_df['analysis.state'].fillna('Analysis Pending', inplace=True)
+    final_df.to_excel("Count.xlsx", index=False)
+    print("Count.xlsx has been successfully created with filenames, component names, and analysis state.")
+
+def generate_final_summary():
+    """Generate final.xlsx with Filename, Jar count, Js count."""
+    final_summary = []
+
+    # Loop through each file in the 'data' folder
+    for file in os.listdir("data"):
+        if file.endswith(".xlsx"):
+            filename = file.replace(".xlsx", "")  # Remove .xlsx extension
+            project_df = pd.read_excel(f"data/{file}")
+
+            # Count occurrences of 'jar' and 'js' in component.name
+            jar_count = project_df[project_df['component.name'].str.contains('jar', case=False, na=False)].shape[0]
+            js_count = project_df[project_df['component.name'].str.contains('js', case=False, na=False)].shape[0]
+
+            # Clean up the filename (e.g., crm_jar → Crm)
+            clean_filename = filename.split('_')[0].capitalize()
+
+            final_summary.append({
+                'Filename': clean_filename,
+                'Jar count': jar_count,
+                'Js count': js_count
+            })
+
+    # Convert summary to DataFrame and save to final.xlsx
+    summary_df = pd.DataFrame(final_summary)
+    summary_df.to_excel("final.xlsx", index=False)
+    print("final.xlsx has been successfully created with Jar and Js counts.")
 
 def main():
     # Fetch all projects to get UUIDs
@@ -100,11 +136,11 @@ def main():
                     analysis_state = row.get('analysis.state', 'Analysis Pending')
                     final_data.append({"Filename": project_name, "component.name": component_name, "analysis.state": analysis_state})
 
-    # After processing all projects, write final data to Count.xlsx
-    final_df = pd.DataFrame(final_data)
+    # Generate Count.xlsx with filenames, component names, and analysis state
+    generate_count_excel(final_data)
 
-    final_df.to_excel("Count.xlsx", index=False)
-    print("Count.xlsx has been successfully created with filenames, component names, and analysis state.")
+    # Generate final.xlsx with Jar and Js counts
+    generate_final_summary()
 
 if __name__ == "__main__":
     main()
