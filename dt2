@@ -29,8 +29,6 @@ def fetch_all_findings(uuid):
     limit = 100  # API limit per request
     max_pages = 100  # Fail-safe: Stop after 100 pages
 
-    last_data_hash = None  # Store hash of last page to detect duplicates
-
     while page <= max_pages:
         url = f"{BASE_API_URL}/finding/project/{uuid}"
         params = {"page": page, "limit": limit}  # Pagination parameters
@@ -44,12 +42,6 @@ def fetch_all_findings(uuid):
                 print(f"No more data for UUID {uuid}, stopping pagination.")
                 break  # Stop if no more records
 
-            data_hash = hash(str(data))  # Convert data to hash for comparison
-            if data_hash == last_data_hash:
-                print(f"Duplicate data detected for UUID {uuid} on page {page}, stopping pagination.")
-                break  # Stop if duplicate page data is detected
-
-            last_data_hash = data_hash  # Update last data hash
             all_findings.extend(data)  # Append current batch to full list
 
             print(f"Fetched {len(data)} records from page {page} for UUID {uuid}")
@@ -83,7 +75,7 @@ def process_and_save_findings():
             # Create an empty DataFrame with required columns
             df_findings = pd.DataFrame(columns=REQUIRED_COLUMNS)  
 
-        # Ensure the required columns exist
+        # Ensure only required columns exist
         if "component.project" not in df_findings.columns:
             df_findings["component.project"] = "Analysis Pending"  # Add column if missing
         if "analysis.state" not in df_findings.columns:
