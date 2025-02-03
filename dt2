@@ -10,19 +10,19 @@ HEADERS = {
     "Accept": "application/json"
 }
 
-INPUT_FILE = "dependency_track.xlsx"  # First Excel file containing UUIDs
-OUTPUT_FILE = "DTResult.xlsx"  # Final filtered result file
+INPUT_FILE = "dependency_track.xlsx"  # Input Excel file containing UUIDs
+OUTPUT_FILE = "DTResult.xlsx"  # Final Excel file
 
 def fetch_all_findings(uuid):
-    """Fetch all pages of findings for a given project UUID."""
+    """Fetch all findings for a given project UUID with pagination."""
     all_findings = []
     page = 1
-    limit = 100  # Number of records per request
+    limit = 100  # API limit per request
 
     while True:
         url = f"{BASE_API_URL}/finding/project/{uuid}"
         params = {"page": page, "limit": limit}  # Pagination parameters
-        
+
         try:
             response = requests.get(url, headers=HEADERS, params=params)
             response.raise_for_status()
@@ -35,9 +35,8 @@ def fetch_all_findings(uuid):
 
             print(f"Fetched {len(data)} records from page {page} for UUID {uuid}")
 
-            # Stop if fewer than 'limit' records are returned (last page)
             if len(data) < limit:
-                break
+                break  # Last page reached
 
             page += 1  # Move to next page
         except requests.exceptions.RequestException as e:
@@ -48,8 +47,13 @@ def fetch_all_findings(uuid):
 
 def process_and_save_findings():
     """Read UUIDs from Excel, fetch findings, filter, and save to Excel."""
-    # Load UUIDs from the first Excel file
-    df_uuids = pd.read_excel(INPUT_FILE, usecols=["uuid"])
+    try:
+        # Load UUIDs from the first Excel file
+        df_uuids = pd.read_excel(INPUT_FILE, usecols=["uuid"])
+    except Exception as e:
+        print(f"Error reading UUIDs from Excel: {e}")
+        return
+
     all_results = []
 
     for uuid in df_uuids["uuid"]:
@@ -62,6 +66,9 @@ def process_and_save_findings():
         # Keep only 'component.project' and 'analysis.state' columns
         required_columns = ["component.project", "analysis.state"]
         df_findings = df_findings[required_columns]
+
+        # Fill missing values in 'analysis.state' with 'Analysis Pending'
+        df_findings["analysis.state"] = df_findings["analysis.state"].fillna("Analysis Pending")
 
         all_results.append(df_findings)
 
