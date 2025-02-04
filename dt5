@@ -1,7 +1,6 @@
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
-from openpyxl.utils import get_column_letter
 from datetime import datetime
 
 # File paths
@@ -17,8 +16,8 @@ df_output = pd.read_excel(output_file)
 # Convert Application names to string for consistency
 df_output["Applications"] = df_output["Applications"].astype(str)
 
-# Get current date in format "1-Feb-2025"
-current_date = datetime.now().strftime("%-d-%b-%Y")  # e.g., 1-Feb-2025
+# Get current date in format "3-Feb-25"
+current_date = datetime.now().strftime("%-d-%b-%y")  # Example: 3-Feb-25
 
 # Function to update each sheet
 def update_sheet(sheet_name, df_project):
@@ -72,7 +71,7 @@ for sheet_name in updated_sheets.keys():
     merged_cell.value = current_date
     merged_cell.alignment = Alignment(horizontal="center", vertical="center")
 
-# Save final project.xlsx with merged cells
+# Save final project.xlsx with merged date row
 wb.save(project_file)
 
-print(f"Successfully updated {project_file} with JAR and JS counts, and merged the date row below headers.")
+print(f"Successfully updated {project_file} with JAR and JS counts, and merged the date row below headers in format {current_date}.")
