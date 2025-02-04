@@ -1,27 +1,78 @@
 import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import Alignment
+from openpyxl.utils import get_column_letter
+from datetime import datetime
 
-# Load project.xlsx and output.xlsx
+# File paths
 project_file = "project.xlsx"
 output_file = "output.xlsx"
 
-df_project = pd.read_excel(project_file)  # Contains Project name, Jar, Js columns
-df_output = pd.read_excel(output_file)  # Contains Applications, JAR count, JS count columns
+# Load project.xlsx with multiple sheets
+sheets = pd.read_excel(project_file, sheet_name=None)
 
-# Perform VLOOKUP-like merge on "Project name" (Project.xlsx) and "Applications" (Output.xlsx)
-df_project = df_project.merge(df_output, how="left", left_on="Project name", right_on="Applications")
+# Load output.xlsx (contains Applications, JAR count, JS count)
+df_output = pd.read_excel(output_file)
 
-# Fill NaN values with 0 for missing counts
-df_project["JAR count"].fillna(0, inplace=True)
-df_project["JS count"].fillna(0, inplace=True)
+# Convert Application names to string for consistency
+df_output["Applications"] = df_output["Applications"].astype(str)
 
-# Move counts into existing Jar and Js columns
-df_project["Jar"] = df_project["JAR count"].astype(int)  # Ensure integer values
-df_project["Js"] = df_project["JS count"].astype(int)
+# Get current date in format "1-Feb-2025"
+current_date = datetime.now().strftime("%-d-%b-%Y")  # e.g., 1-Feb-2025
 
-# Drop unnecessary columns
-df_project.drop(columns=["Applications", "JAR count", "JS count"], inplace=True)
+# Function to update each sheet
+def update_sheet(sheet_name, df_project):
+    # Merge project data with output.xlsx using VLOOKUP-like behavior
+    df_project = df_project.merge(df_output, how="left", left_on="Project name", right_on="Applications")
+
+    # Fill NaN values with 0 for missing counts
+    df_project["JAR count"].fillna(0, inplace=True)
+    df_project["JS count"].fillna(0, inplace=True)
+
+    # Convert to integer format
+    df_project["JAR count"] = df_project["JAR count"].astype(int)
+    df_project["JS count"] = df_project["JS count"].astype(int)
+
+    # Rename JAR count and JS count to match project.xlsx headers
+    df_project.rename(columns={"JAR count": "Jar", "JS count": "Js"}, inplace=True)
+
+    # Drop unnecessary "Applications" column
+    df_project.drop(columns=["Applications"], inplace=True)
+
+    return df_project
+
+# Process both sheets separately
+updated_sheets = {
+    "Daily_Monitoring_Apps": update_sheet("Daily_Monitoring_Apps", sheets["Daily_Monitoring_Apps"]),
+    "Non-Daily_Monitoring_Apps": update_sheet("Non-Daily_Monitoring_Apps", sheets["Non-Daily_Monitoring_Apps"])
+}
 
 # Save the updated project.xlsx
-df_project.to_excel(project_file, index=False)
+with pd.ExcelWriter(project_file, engine="openpyxl") as writer:
+    for sheet_name, df in updated_sheets.items():
+        df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-print(f"Successfully updated {project_file} with JAR and JS counts.")
+# Load the Excel file again with openpyxl for merging cells
+wb = load_workbook(project_file)
+
+for sheet_name in updated_sheets.keys():
+    ws = wb[sheet_name]
+
+    # Find column indexes for "Jar" and "Js"
+    headers = [cell.value for cell in ws[1]]  # Read first row (headers)
+    jar_col = headers.index("Jar") + 1  # Convert to 1-based index
+    js_col = headers.index("Js") + 1  # Convert to 1-based index
+
+    # Insert a new row below headers
+    ws.insert_rows(2)
+
+    # Merge "Jar" and "Js" columns in row 2
+    ws.merge_cells(start_row=2, start_column=jar_col, end_row=2, end_column=js_col)
+    merged_cell = ws.cell(row=2, column=jar_col)
+    merged_cell.value = current_date
+    merged_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+# Save final project.xlsx with merged cells
+wb.save(project_file)
+
+print(f"Successfully updated {project_file} with JAR and JS counts, and merged the date row below headers.")
