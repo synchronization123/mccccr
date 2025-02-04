@@ -1,0 +1,27 @@
+import pandas as pd
+
+# Load project.xlsx and output.xlsx
+project_file = "project.xlsx"
+output_file = "output.xlsx"
+
+df_project = pd.read_excel(project_file)  # Contains Project name, Jar, Js columns
+df_output = pd.read_excel(output_file)  # Contains Applications, JAR count, JS count columns
+
+# Perform VLOOKUP-like merge on "Project name" (Project.xlsx) and "Applications" (Output.xlsx)
+df_project = df_project.merge(df_output, how="left", left_on="Project name", right_on="Applications")
+
+# Fill NaN values with 0 for missing counts
+df_project["JAR count"].fillna(0, inplace=True)
+df_project["JS count"].fillna(0, inplace=True)
+
+# Move counts into existing Jar and Js columns
+df_project["Jar"] = df_project["JAR count"].astype(int)  # Ensure integer values
+df_project["Js"] = df_project["JS count"].astype(int)
+
+# Drop unnecessary columns
+df_project.drop(columns=["Applications", "JAR count", "JS count"], inplace=True)
+
+# Save the updated project.xlsx
+df_project.to_excel(project_file, index=False)
+
+print(f"Successfully updated {project_file} with JAR and JS counts.")
