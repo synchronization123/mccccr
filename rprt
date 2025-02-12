@@ -1,0 +1,151 @@
+import dearpygui.dearpygui as dpg
+import requests
+import datetime
+import smtplib
+import webbrowser
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+# AWS SES SMTP Configuration
+AWS_SMTP_SERVER = "email-smtp.us-east-1.amazonaws.com"  # AWS SES SMTP Server
+AWS_SMTP_PORT = 587  # Use 587 for TLS, 465 for SSL
+AWS_SMTP_USERNAME = "your_smtp_username"  # AWS SES SMTP Username
+AWS_SMTP_PASSWORD = "your_smtp_password"  # AWS SES SMTP Password
+SENDER_EMAIL = "your-sender-email@example.com"
+SENDER_NAME = "Your Name"
+RECIPIENT_EMAILS = ["recipient1@example.com", "recipient2@example.com"]
+CC_EMAILS = ["cc1@example.com", "cc2@example.com"]
+
+# JIRA API details
+JIRA_API_TOKEN = "jsjjd"
+JIRA_URL = "https://your-jira-instance.atlassian.net/rest/api/2/search"
+
+# Function to get shift times based on holidays
+def get_shift_times():
+    today = datetime.datetime.now()
+    weekday = today.weekday()  # Monday=0, Sunday=6
+
+    holidays = {
+        "mon": dpg.get_value("holiday_mon"),
+        "tue": dpg.get_value("holiday_tue"),
+        "wed": dpg.get_value("holiday_wed"),
+        "thu": dpg.get_value("holiday_thu"),
+        "fri": dpg.get_value("holiday_fri"),
+    }
+
+    if weekday == 1 and (holidays["mon"] or holidays["fri"]):  # Tuesday after holiday
+        shift_start = (today - datetime.timedelta(days=5)).strftime("%Y-%m-%d") + " 11:30"
+    elif weekday in [0, 5, 6]:  # Monday, Saturday, or Sunday
+        shift_start = (today - datetime.timedelta(days=today.weekday() + 2)).strftime("%Y-%m-%d") + " 11:30"
+    else:
+        shift_start = today.strftime("%Y-%m-%d") + " 01:30"
+
+    shift_end = today.strftime("%Y-%m-%d") + " 11:30"
+    after_shift_start = shift_end
+    after_shift_end = (today + datetime.timedelta(days=1)).strftime("%Y-%m-%d") + " 01:29"
+
+    return shift_start, shift_end, after_shift_start, after_shift_end
+
+# Function to fetch FS counts from JIRA
+def fetch_fs_counts():
+    shift_start, shift_end, after_shift_start, after_shift_end = get_shift_times()
+
+    headers = {"Authorization": f"Bearer {JIRA_API_TOKEN}", "Content-Type": "application/json"}
+
+    query_during_shift = f'status CHANGED TO "fs-security pending" DURING ("{shift_start}", "{shift_end}")'
+    response_during = requests.get(JIRA_URL, headers=headers, params={"jql": query_during_shift})
+
+    query_after_shift = f'status CHANGED TO "fs-security pending" DURING ("{after_shift_start}", "{after_shift_end}")'
+    response_after = requests.get(JIRA_URL, headers=headers, params={"jql": query_after_shift})
+
+    count_during = response_during.json().get("total", 0) if response_during.status_code == 200 else 0
+    count_after = response_after.json().get("total", 0) if response_after.status_code == 200 else 0
+
+    total_received = count_during + count_after
+
+    if total_received > 0:
+        accepted = round((count_during * 2 + count_after) / 3)
+        rejected = round((count_during + count_after) / 5)
+        carry_forwarded = total_received - (accepted + rejected)
+    else:
+        accepted = rejected = carry_forwarded = 0
+
+    dpg.set_value("during_shift", count_during)
+    dpg.set_value("after_shift", count_after)
+    dpg.set_value("total_received", total_received)
+    dpg.set_value("accepted", accepted)
+    dpg.set_value("rejected", rejected)
+    dpg.set_value("carry_forwarded", carry_forwarded)
+
+# Function to generate HTML report and open it
+def generate_html_report():
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+
+    report_path = "fs_report.html"
+    report_content = f"""
+    <html>
+    <head>
+        <title>FS Report - {today}</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 20px; }}
+            table {{ width: 50%; border-collapse: collapse; margin-top: 10px; }}
+            th, td {{ border: 1px solid black; padding: 8px; text-align: center; }}
+            th {{ background-color: #f4f4f4; }}
+        </style>
+    </head>
+    <body>
+        <h2>FS Report - {today}</h2>
+        <table>
+            <tr><th>Metric</th><th>Count</th></tr>
+            <tr><td>During Shift</td><td>{dpg.get_value("during_shift")}</td></tr>
+            <tr><td>After Shift</td><td>{dpg.get_value("after_shift")}</td></tr>
+            <tr><td>Total Received</td><td>{dpg.get_value("total_received")}</td></tr>
+            <tr><td>Accepted</td><td>{dpg.get_value("accepted")}</td></tr>
+            <tr><td>Rejected</td><td>{dpg.get_value("rejected")}</td></tr>
+            <tr><td>Carry Forwarded</td><td>{dpg.get_value("carry_forwarded")}</td></tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    with open(report_path, "w") as file:
+        file.write(report_content)
+
+    webbrowser.open(report_path)  # Open report automatically
+
+# Function to send email via AWS SES SMTP
+def send_email_report():
+    with open("fs_report.html", "r") as file:
+        html_content = file.read()
+
+    msg = MIMEMultipart()
+    msg["From"] = f"{SENDER_NAME} <{SENDER_EMAIL}>"
+    msg["To"] = ", ".join(RECIPIENT_EMAILS)
+    msg["Cc"] = ", ".join(CC_EMAILS)
+    msg["Subject"] = "FS Report"
+
+    msg.attach(MIMEText(html_content, "html"))
+
+    with smtplib.SMTP(AWS_SMTP_SERVER, AWS_SMTP_PORT) as server:
+        server.starttls()
+        server.login(AWS_SMTP_USERNAME, AWS_SMTP_PASSWORD)
+        server.send_message(msg)
+
+    print("Email Sent Successfully!")
+
+# UI Setup
+dpg.create_context()
+dpg.create_viewport(title="FS Report", width=500, height=450)
+
+with dpg.window(label="FS Report", width=480, height=400):
+    for day in ["mon", "tue", "wed", "thu", "fri"]:
+        dpg.add_checkbox(label=day.capitalize(), tag=f"holiday_{day}")
+    
+    dpg.add_button(label="Fetch Data", callback=fetch_fs_counts)
+    dpg.add_button(label="Generate HTML Report", callback=generate_html_report)
+    dpg.add_button(label="Send Email Report", callback=send_email_report)
+
+dpg.setup_dearpygui()
+dpg.show_viewport()
+dpg.start_dearpygui()
+dpg.destroy_context()
