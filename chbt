@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DefectDojo Chatbot</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Chatbot Styles */
+        #chatbot-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            display: none;
+        }
+        #chatbot-header {
+            background: #007bff;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+        #chatbot-body {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .chatbot-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 16px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        /* Table Styles */
+        table {
+            width: 100%;
+        }
+        th, td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+        /* Pagination Styles */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        .page-item {
+            cursor: pointer;
+            padding: 5px 10px;
+            margin: 2px;
+            border: 1px solid #007bff;
+            color: #007bff;
+            border-radius: 5px;
+        }
+        .page-item.active {
+            background-color: #007bff;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Chatbot Button -->
+<button class="chatbot-button" onclick="toggleChatbot()">💬</button>
+
+<!-- Chatbot Container -->
+<div id="chatbot-container">
+    <div id="chatbot-header">
+        DefectDojo Chatbot
+        <button class="btn btn-sm btn-light float-end" onclick="toggleChatbot()">✖</button>
+    </div>
+    <div id="chatbot-body">
+        <button class="btn btn-primary w-100 mb-2" onclick="fetchTasks()">View My Tasks</button>
+        <div id="task-container"></div>
+    </div>
+</div>
+
+<script>
+    let tasks = [];
+    let currentPage = 1;
+    const tasksPerPage = 5;
+
+    function toggleChatbot() {
+        let chatbot = document.getElementById('chatbot-container');
+        chatbot.style.display = chatbot.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function fetchTasks() {
+        fetch("https://demo.defectdojo.org/api/v2/engagements")
+            .then(response => response.json())
+            .then(data => {
+                tasks = data.results || [];
+                currentPage = 1;
+                renderTasks();
+            })
+            .catch(error => console.error("Error fetching tasks:", error));
+    }
+
+    function renderTasks() {
+        let start = (currentPage - 1) * tasksPerPage;
+        let end = start + tasksPerPage;
+        let paginatedTasks = tasks.slice(start, end);
+
+        let tableHtml = `
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Tags</th>
+                        <th>Name</th>
+                        <th>Start</th>
+                        <th>End</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        paginatedTasks.forEach(task => {
+            tableHtml += `
+                <tr>
+                    <td>${task.tag ? task.tag.join(", ") : "-"}</td>
+                    <td>${task.name}</td>
+                    <td>${task.target_start || "-"}</td>
+                    <td>${task.target_end || "-"}</td>
+                    <td>${task.status}</td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `</tbody></table>`;
+        tableHtml += renderPagination();
+
+        document.getElementById("task-container").innerHTML = tableHtml;
+    }
+
+    function renderPagination() {
+        let totalPages = Math.ceil(tasks.length / tasksPerPage);
+        let paginationHtml = `<div class="pagination">`;
+
+        for (let i = 1; i <= totalPages; i++) {
+            paginationHtml += `
+                <span class="page-item ${i === currentPage ? 'active' : ''}" onclick="changePage(${i})">${i}</span>
+            `;
+        }
+
+        paginationHtml += `</div>`;
+        return paginationHtml;
+    }
+
+    function changePage(page) {
+        if (page >= 1 && page <= Math.ceil(tasks.length / tasksPerPage)) {
+            currentPage = page;
+            renderTasks();
+        }
+    }
+</script>
+
+</body>
+</html>
