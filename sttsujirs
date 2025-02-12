@@ -16,13 +16,12 @@ def get_date_range():
     end_date = input("Enter end date (YYYY-MM-DD): ").strip()
     return start_date, end_date
 
-# Function to query Jira API for a specific status change by user
+# Function to query Jira API for status change count
 def fetch_total_count(status_from, status_to, user, start_date, end_date):
     jql_query = f"""
         status changed FROM "{status_from}" TO "{status_to}" BY {user} DURING ("{start_date}", "{end_date} 23:59")
     """
-    
-    params = {"jql": jql_query, "maxResults": 0}  # Only fetch the total count
+    params = {"jql": jql_query, "maxResults": 0}  # Only fetch total count
     
     response = requests.get(JIRA_URL, headers=HEADERS, params=params)
     
@@ -31,6 +30,30 @@ def fetch_total_count(status_from, status_to, user, start_date, end_date):
     else:
         print(f"Error fetching data for {user}: {response.status_code}, {response.text}")
         return 0
+
+# Function to fetch "Epic Link" counts for DS Accepted issues
+def fetch_epic_links(user, start_date, end_date):
+    jql_query = f"""
+        status changed FROM "ds-security review pending" TO "reopened" BY {user} DURING ("{start_date}", "{end_date} 23:59")
+    """
+    params = {"jql": jql_query, "maxResults": 100, "fields": "key,customfield_10000"}  # customfield_10000 = Epic Link
+    
+    response = requests.get(JIRA_URL, headers=HEADERS, params=params)
+    
+    if response.status_code == 200:
+        issues = response.json().get("issues", [])
+        epic_count = {}
+
+        for issue in issues:
+            epic_link = issue.get("fields", {}).get("customfield_10000", "")
+            if epic_link:
+                epic_count[epic_link] = epic_count.get(epic_link, 0) + 1
+
+        # Format output as multiline "EPIC-1: 3\nEPIC-2: 6"
+        return "\n".join([f"{epic}: {count}" for epic, count in epic_count.items()])
+    else:
+        print(f"Error fetching Epic Links for {user}: {response.status_code}, {response.text}")
+        return ""
 
 # Read users from users.xlsx
 users_df = pd.read_excel("users.xlsx")  # Ensure the file exists
@@ -46,22 +69,31 @@ data = []
 for user in users:
     fs_count = fetch_total_count("fs-security review pending", "done", user, start_date, end_date)
     ds_count = fetch_total_count("ds-security review pending", "reopened", user, start_date, end_date)
+    epic_links = fetch_epic_links(user, start_date, end_date)
     
-    data.append([user, fs_count, ds_count])
+    data.append([user, fs_count if fs_count > 0 else "", ds_count if ds_count > 0 else "", epic_links])
 
 # Convert data to DataFrame
-df = pd.DataFrame(data, columns=["User", "FS Accepted", "DS Accepted"])
+df = pd.DataFrame(data, columns=["User", "FS Accepted", "DS Accepted", "Epic Links"])
 
 # Add total row at the bottom
-total_fs = df["FS Accepted"].sum()
-total_ds = df["DS Accepted"].sum()
-df.loc["Total"] = ["TOTAL", total_fs, total_ds]
+total_fs = df["FS Accepted"].replace("", 0).sum()
+total_ds = df["DS Accepted"].replace("", 0).sum()
+df.loc["Total"] = ["TOTAL", total_fs if total_fs > 0 else "", total_ds if total_ds > 0 else "", ""]
 
 # Generate the filename with the current date
 current_date = datetime.datetime.now().strftime("%Y-%m-%d")
 filename = f"{current_date}-FS,DS,RFS-Report.xlsx"
 
-# Write results to Excel
-df.to_excel(filename, index=False)
+# Write results to Excel, keeping multiline formatting
+with pd.ExcelWriter(filename, engine="openpyxl") as writer:
+    df.to_excel(writer, index=False)
+    worksheet = writer.sheets["Sheet1"]
+
+    # Adjust column width and enable text wrapping for "Epic Links"
+    for col in ["D"]:
+        worksheet.column_dimensions[col].width = 30  # Adjust width
+        for row in range(2, len(df) + 2):  # Skip header row
+            worksheet[f"{col}{row}"].alignment = worksheet[f"A1"].alignment.copy(wrap_text=True)
 
 print(f"Report generated: {filename}")
