@@ -1,0 +1,58 @@
+import requests
+import datetime
+
+# Jira API configuration
+JIRA_URL = "https://your-jira-instance.atlassian.net/rest/api/2/search"
+JIRA_API_TOKEN = "jsjjd"  # Replace with the actual API token
+HEADERS = {
+    "Authorization": f"Bearer {JIRA_API_TOKEN}",
+    "Content-Type": "application/json",
+}
+
+# Function to get user input for the date range
+def get_date_range():
+    start_date = input("Enter start date (YYYY-MM-DD): ").strip()
+    end_date = input("Enter end date (YYYY-MM-DD): ").strip()
+    
+    # Append time range to match the required format
+    start_datetime_fs = f"{start_date} 01:30"
+    end_datetime_fs = f"{start_date} 11:30"
+    
+    start_datetime_ds = f"{start_date} 11:30"
+    end_datetime_ds = f"{end_date} 01:29"
+    
+    return start_datetime_fs, end_datetime_fs, start_datetime_ds, end_datetime_ds
+
+# Function to query Jira API for a specific status change
+def fetch_total_count(status, start_time, end_time):
+    jql_query = f"""
+        status changed to "{status}" DURING ("{start_time}", "{end_time}")
+    """
+    
+    params = {"jql": jql_query, "maxResults": 0}  # We only need the total count
+    
+    response = requests.get(JIRA_URL, headers=HEADERS, params=params)
+    
+    if response.status_code == 200:
+        return response.json().get("total", 0)
+    else:
+        print(f"Error fetching data for {status}: {response.status_code}, {response.text}")
+        return 0
+
+# Get the user-defined date range
+fs_start, fs_end, ds_start, ds_end = get_date_range()
+
+# Fetch counts
+fs_count = fetch_total_count("fs-security pending", fs_start, fs_end)
+ds_count = fetch_total_count("ds-security pending", ds_start, ds_end)
+
+# Generate the filename with the current date
+current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+filename = f"{current_date}-FS,DS,RFS-Report.txt"
+
+# Write results to file
+with open(filename, "w") as file:
+    file.write(f"FS Accepted: {fs_count}\n")
+    file.write(f"DS Accepted: {ds_count}\n")
+
+print(f"Report generated: {filename}")
