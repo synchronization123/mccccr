@@ -39,24 +39,29 @@ users = users_df["Username"].tolist()
 # Get date range from user input
 start_date, end_date = get_date_range()
 
-# Dictionary to store results
-results = {}
+# List to store results
+data = []
 
 # Check Jira status changes for each user
 for user in users:
     fs_count = fetch_total_count("fs-security review pending", "done", user, start_date, end_date)
     ds_count = fetch_total_count("ds-security review pending", "reopened", user, start_date, end_date)
     
-    results[user] = {"FS Accepted": fs_count, "DS Reopened": ds_count}
+    data.append([user, fs_count, ds_count])
 
-# Generate the report filename with the current date
+# Convert data to DataFrame
+df = pd.DataFrame(data, columns=["User", "FS Accepted", "DS Accepted"])
+
+# Add total row at the bottom
+total_fs = df["FS Accepted"].sum()
+total_ds = df["DS Accepted"].sum()
+df.loc["Total"] = ["TOTAL", total_fs, total_ds]
+
+# Generate the filename with the current date
 current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-filename = f"{current_date}-FS,DS,RFS-Report.txt"
+filename = f"{current_date}-FS,DS,RFS-Report.xlsx"
 
-# Write results to the report file
-with open(filename, "w") as file:
-    file.write("User, FS Accepted, DS Reopened\n")
-    for user, counts in results.items():
-        file.write(f"{user}, {counts['FS Accepted']}, {counts['DS Reopened']}\n")
+# Write results to Excel
+df.to_excel(filename, index=False)
 
 print(f"Report generated: {filename}")
