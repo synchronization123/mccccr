@@ -1,58 +1,62 @@
 import requests
+import pandas as pd
 import datetime
 
-# Jira API configuration
+# Jira API Configuration
 JIRA_URL = "https://your-jira-instance.atlassian.net/rest/api/2/search"
-JIRA_API_TOKEN = "jsjjd"  # Replace with the actual API token
+JIRA_API_TOKEN = "jsjjd"  # Replace with actual token
 HEADERS = {
     "Authorization": f"Bearer {JIRA_API_TOKEN}",
     "Content-Type": "application/json",
 }
 
-# Function to get user input for the date range
+# Function to get date input from the user
 def get_date_range():
     start_date = input("Enter start date (YYYY-MM-DD): ").strip()
     end_date = input("Enter end date (YYYY-MM-DD): ").strip()
-    
-    # Append time range to match the required format
-    start_datetime_fs = f"{start_date} 01:30"
-    end_datetime_fs = f"{start_date} 11:30"
-    
-    start_datetime_ds = f"{start_date} 11:30"
-    end_datetime_ds = f"{end_date} 01:29"
-    
-    return start_datetime_fs, end_datetime_fs, start_datetime_ds, end_datetime_ds
+    return start_date, end_date
 
-# Function to query Jira API for a specific status transition
-def fetch_total_count(from_status, to_status, start_time, end_time):
+# Function to query Jira API for a specific status change by user
+def fetch_total_count(status_from, status_to, user, start_date, end_date):
     jql_query = f"""
-        status changed from "{from_status}" to "{to_status}" DURING ("{start_time}", "{end_time}")
+        status changed FROM "{status_from}" TO "{status_to}" BY {user} DURING ("{start_date}", "{end_date} 23:59")
     """
     
-    params = {"jql": jql_query, "maxResults": 0}  # We only need the total count
+    params = {"jql": jql_query, "maxResults": 0}  # Only fetch the total count
     
     response = requests.get(JIRA_URL, headers=HEADERS, params=params)
     
     if response.status_code == 200:
         return response.json().get("total", 0)
     else:
-        print(f"Error fetching data for {from_status} → {to_status}: {response.status_code}, {response.text}")
+        print(f"Error fetching data for {user}: {response.status_code}, {response.text}")
         return 0
 
-# Get the user-defined date range
-fs_start, fs_end, ds_start, ds_end = get_date_range()
+# Read users from users.xlsx
+users_df = pd.read_excel("users.xlsx")  # Ensure the file exists
+users = users_df["Username"].tolist()
 
-# Fetch counts
-fs_count = fetch_total_count("fs-security review pending", "done", fs_start, fs_end)
-ds_count = fetch_total_count("ds-security review pending", "reopened", ds_start, ds_end)
+# Get date range from user input
+start_date, end_date = get_date_range()
 
-# Generate the filename with the current date
+# Dictionary to store results
+results = {}
+
+# Check Jira status changes for each user
+for user in users:
+    fs_count = fetch_total_count("fs-security review pending", "done", user, start_date, end_date)
+    ds_count = fetch_total_count("ds-security review pending", "reopened", user, start_date, end_date)
+    
+    results[user] = {"FS Accepted": fs_count, "DS Reopened": ds_count}
+
+# Generate the report filename with the current date
 current_date = datetime.datetime.now().strftime("%Y-%m-%d")
 filename = f"{current_date}-FS,DS,RFS-Report.txt"
 
-# Write results to file
+# Write results to the report file
 with open(filename, "w") as file:
-    file.write(f"FS Accepted: {fs_count}\n")
-    file.write(f"DS Accepted: {ds_count}\n")
+    file.write("User, FS Accepted, DS Reopened\n")
+    for user, counts in results.items():
+        file.write(f"{user}, {counts['FS Accepted']}, {counts['DS Reopened']}\n")
 
 print(f"Report generated: {filename}")
