@@ -9,19 +9,16 @@ from pystray import Icon, MenuItem, Menu
 from PIL import Image, ImageDraw
 
 # Contrast API Configuration
-CONTRAST_API_URL = "https://app.contrastsecurity.com/Contrast/api/ng/org-id/traces"
+ORG_UUID = "your_org_uuid"
+CONTRAST_API_URL = f"https://app.contrastsecurity.com/ng/{ORG_UUID}/orgtraces/ids"
 API_KEY = "your_api_key"
-AUTH_HEADER = {"Authorization": f"Bearer {API_KEY}"}
-QUERY_PARAMS = {"statuses": "Reported", "severities": "CRITICAL,HIGH,MEDIUM"}  # Ensure filtering
+HEADERS = {"Authorization": f"Bearer {API_KEY}"}
+PARAMS = {"severities": "CRITICAL,HIGH", "status": "REPORTED"}
 
-# Severities to monitor
-SEVERITY_LEVELS = {"Medium", "High", "Critical"}
+# Maintain seen trace IDs
 LAST_TRACE_IDS = set()
-MONITORING = True  # Flag to track monitoring state
-
-# GUI window reference
-gui_window = None
-
+MONITORING = True  # Flag for background process
+gui_window = None  # GUI window reference
 
 def create_icon():
     """Creates a simple system tray icon."""
@@ -29,7 +26,6 @@ def create_icon():
     draw = ImageDraw.Draw(image)
     draw.rectangle((10, 10, 54, 54), fill="black")
     return image
-
 
 def log_message(message):
     """Logs messages to the GUI console."""
@@ -39,56 +35,50 @@ def log_message(message):
         gui_window.log_area.insert(tk.END, message + "\n")
         gui_window.log_area.yview(tk.END)
 
-
 def get_latest_traces():
     """Fetches the latest traces from Contrast API."""
     try:
-        response = requests.get(CONTRAST_API_URL, headers=AUTH_HEADER, params=QUERY_PARAMS)
-        
+        response = requests.get(CONTRAST_API_URL, headers=HEADERS, params=PARAMS)
         if response.status_code == 200:
-            traces = response.json().get("traces", [])
-            return traces
+            data = response.json()
+            if data.get("success"):
+                return set(data.get("traces", []))
+            else:
+                log_message("[WARNING] API Response: Success flag is False")
+                return set()
         else:
-            log_message(f"[WARNING] API Error: {response.status_code}")
-            return []
+            log_message(f"[ERROR] API Error: {response.status_code}")
+            return set()
     except Exception as e:
         log_message(f"[ERROR] Failed to fetch traces: {str(e)}")
-        return []
+        return set()
 
-
-def notify_user(severity, title):
+def notify_user(severity):
     """Shows a toast notification for a new trace."""
     notification.notify(
         title=f"New {severity} Severity Trace Reported",
-        message=title,
+        message="A new trace has been reported. Please check.",
         timeout=10
     )
 
-
 def check_for_new_traces():
-    """Checks for new traces and sends a notification if found."""
+    """Checks for new traces and sends notifications if found."""
     global LAST_TRACE_IDS
     latest_traces = get_latest_traces()
 
-    for trace in latest_traces:
-        trace_id = trace["uuid"]
-        severity = trace["severity"]
-        status = trace["status"]
-        title = trace["title"]
-
-        if status == "Reported" and severity in SEVERITY_LEVELS and trace_id not in LAST_TRACE_IDS:
-            log_message(f"[ALERT] New {severity} trace detected: {title}")
-            notify_user(severity, title)
-            LAST_TRACE_IDS.add(trace_id)  # Store seen trace IDs
-
+    new_traces = latest_traces - LAST_TRACE_IDS
+    if new_traces:
+        for trace_id in new_traces:
+            log_message(f"[ALERT] New trace detected: {trace_id}")
+            notify_user("High/Critical")  # Assuming severity is always Critical/High
+        LAST_TRACE_IDS = latest_traces  # Update seen traces
 
 def background_task():
-    """Runs trace checking every 5 minutes in the background."""
+    """Runs trace checking every 5 minutes."""
     while MONITORING:
         log_message("[INFO] Monitoring Contrast Security for new traces...")
         check_for_new_traces()
         time.sleep(300)  # Wait for 5 minutes
-
 
 class ConsoleWindow:
     """GUI Window to show log messages."""
@@ -115,7 +105,6 @@ class ConsoleWindow:
         """Starts the GUI main loop."""
         self.root.mainloop()
 
-
 def open_console():
     """Opens the GUI console."""
     global gui_window
@@ -123,14 +112,12 @@ def open_console():
         gui_window = ConsoleWindow()
         gui_window.run()
 
-
 def quit_app(icon, item):
     """Stops the script when exiting from the tray."""
     global MONITORING
     MONITORING = False
     icon.stop()
     log_message("[INFO] Notifier exited.")
-
 
 # Setup system tray menu
 menu = Menu(
