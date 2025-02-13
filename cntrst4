@@ -48,9 +48,8 @@ def get_latest_trace():
             if traces:
                 return traces[0]  # Get the newest trace
         return None
-    except Exception as e:
-        log_message(f"[ERROR] Failed to fetch traces: {e}")
-        return None
+    except Exception:
+        return None  # No warnings or logs if API fails
 
 
 def notify_user(severity, title):
@@ -77,16 +76,12 @@ def check_for_new_traces():
             log_message(f"[ALERT] New {severity} trace detected: {title}")
             notify_user(severity, title)
             LAST_TRACE_ID = trace_id  # Update last processed trace
-        else:
-            log_message("[INFO] No new traces found.")
-    else:
-        log_message("[WARNING] Unable to retrieve trace data.")
 
 
 def background_task():
     """Runs trace checking every 5 minutes in the background."""
     while MONITORING:
-        log_message("[INFO] Checking for new security traces...")
+        log_message("[INFO] Monitoring Contrast Security for new traces...")
         check_for_new_traces()
         time.sleep(300)  # Wait for 5 minutes
 
