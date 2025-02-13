@@ -1,0 +1,106 @@
+import time
+import json
+import requests
+import threading
+import subprocess
+import sys
+import os
+from plyer import notification
+from pystray import Icon, MenuItem, Menu
+from PIL import Image, ImageDraw
+
+# Contrast API Configuration
+CONTRAST_API_URL = "https://app.contrastsecurity.com/Contrast/api/ng/org-id/traces"
+API_KEY = "your_api_key"
+AUTH_HEADER = {"Authorization": f"Bearer {API_KEY}"}
+
+# Severities to monitor
+SEVERITY_LEVELS = {"Medium", "High", "Critical"}
+LAST_TRACE_ID = None
+MONITORING = True  # Flag to track monitoring state
+
+# Create a system tray icon
+def create_icon():
+    """Creates a simple system tray icon."""
+    image = Image.new("RGB", (64, 64), (255, 255, 255))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((10, 10, 54, 54), fill="black")
+    return image
+
+def open_console():
+    """Open a console window to show monitoring logs."""
+    if sys.platform == "win32":
+        subprocess.run("start cmd /k python contrast_notifier.py", shell=True)
+    elif sys.platform == "darwin":  # macOS
+        subprocess.run(["osascript", "-e", 'tell application "Terminal" to do script "python3 contrast_notifier.py"'])
+    else:  # Linux
+        subprocess.Popen(["x-terminal-emulator", "-e", "python3 contrast_notifier.py"])
+
+def get_latest_trace():
+    """Fetches the latest trace from Contrast API."""
+    try:
+        response = requests.get(CONTRAST_API_URL, headers=AUTH_HEADER)
+        if response.status_code == 200:
+            traces = response.json().get("traces", [])
+            if traces:
+                return traces[0]  # Get the newest trace
+        return None
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch traces: {e}")
+        return None
+
+def notify_user(severity, title):
+    """Shows a toast notification for a new trace."""
+    notification.notify(
+        title=f"New {severity} Severity Trace Reported",
+        message=title,
+        timeout=10
+    )
+
+def check_for_new_traces():
+    """Checks for new traces and sends a notification if found."""
+    global LAST_TRACE_ID
+    latest_trace = get_latest_trace()
+    
+    if latest_trace:
+        trace_id = latest_trace["uuid"]
+        severity = latest_trace["severity"]
+        status = latest_trace["status"]
+        title = latest_trace["title"]
+
+        if status == "Reported" and severity in SEVERITY_LEVELS and trace_id != LAST_TRACE_ID:
+            print(f"[ALERT] New {severity} trace detected: {title}")
+            notify_user(severity, title)
+            LAST_TRACE_ID = trace_id  # Update last processed trace
+        else:
+            print("[INFO] No new traces found.")
+
+def background_task():
+    """Runs trace checking every 5 minutes in the background."""
+    while MONITORING:
+        print("[INFO] Checking for new security traces...")
+        check_for_new_traces()
+        time.sleep(300)  # Wait for 5 minutes
+
+def quit_app(icon, item):
+    """Stops the script when exiting from the tray."""
+    global MONITORING
+    MONITORING = False
+    icon.stop()
+    print("[INFO] Notifier exited.")
+
+# Setup system tray menu
+menu = Menu(
+    MenuItem("Open Console", open_console),
+    MenuItem("Exit", quit_app)
+)
+
+# Create and run system tray icon
+icon = Icon("Contrast Notifier", create_icon(), menu=menu)
+
+# Start background thread
+thread = threading.Thread(target=background_task, daemon=True)
+thread.start()
+
+# Run the system tray application
+icon.run()
