@@ -1,0 +1,147 @@
+import time
+import json
+import requests
+import threading
+import tkinter as tk
+from tkinter import scrolledtext
+from plyer import notification
+from pystray import Icon, MenuItem, Menu
+from PIL import Image, ImageDraw
+
+# Contrast API Configuration
+CONTRAST_API_URL = "https://app.contrastsecurity.com/Contrast/api/ng/org-id/traces"
+API_KEY = "your_api_key"
+AUTH_HEADER = {"Authorization": f"Bearer {API_KEY}"}
+
+# Severities to monitor
+SEVERITY_LEVELS = {"Medium", "High", "Critical"}
+LAST_TRACE_ID = None
+MONITORING = True  # Flag to track monitoring state
+
+# GUI window reference
+gui_window = None
+
+
+def create_icon():
+    """Creates a simple system tray icon."""
+    image = Image.new("RGB", (64, 64), (255, 255, 255))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((10, 10, 54, 54), fill="black")
+    return image
+
+
+def log_message(message):
+    """Logs messages to the GUI console."""
+    global gui_window
+    if gui_window:
+        gui_window.log_area.insert(tk.END, message + "\n")
+        gui_window.log_area.yview(tk.END)
+
+
+def get_latest_trace():
+    """Fetches the latest trace from Contrast API."""
+    try:
+        response = requests.get(CONTRAST_API_URL, headers=AUTH_HEADER)
+        if response.status_code == 200:
+            traces = response.json().get("traces", [])
+            if traces:
+                return traces[0]  # Get the newest trace
+        return None
+    except Exception as e:
+        log_message(f"[ERROR] Failed to fetch traces: {e}")
+        return None
+
+
+def notify_user(severity, title):
+    """Shows a toast notification for a new trace."""
+    notification.notify(
+        title=f"New {severity} Severity Trace Reported",
+        message=title,
+        timeout=10
+    )
+
+
+def check_for_new_traces():
+    """Checks for new traces and sends a notification if found."""
+    global LAST_TRACE_ID
+    latest_trace = get_latest_trace()
+
+    if latest_trace:
+        trace_id = latest_trace["uuid"]
+        severity = latest_trace["severity"]
+        status = latest_trace["status"]
+        title = latest_trace["title"]
+
+        if status == "Reported" and severity in SEVERITY_LEVELS and trace_id != LAST_TRACE_ID:
+            log_message(f"[ALERT] New {severity} trace detected: {title}")
+            notify_user(severity, title)
+            LAST_TRACE_ID = trace_id  # Update last processed trace
+        else:
+            log_message("[INFO] No new traces found.")
+
+
+def background_task():
+    """Runs trace checking every 5 minutes in the background."""
+    while MONITORING:
+        log_message("[INFO] Checking for new security traces...")
+        check_for_new_traces()
+        time.sleep(300)  # Wait for 5 minutes
+
+
+class ConsoleWindow:
+    """GUI Window to show log messages."""
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("Contrast Notifier Console")
+        self.root.geometry("600x400")
+
+        # Log display area
+        self.log_area = scrolledtext.ScrolledText(self.root, wrap=tk.WORD, width=70, height=20)
+        self.log_area.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
+
+        # Close button
+        close_button = tk.Button(self.root, text="Close", command=self.close_window)
+        close_button.pack(pady=5)
+
+    def close_window(self):
+        """Closes the GUI but keeps the script running in the background."""
+        global gui_window
+        gui_window = None
+        self.root.destroy()
+
+    def run(self):
+        """Starts the GUI main loop."""
+        self.root.mainloop()
+
+
+def open_console():
+    """Opens the GUI console."""
+    global gui_window
+    if gui_window is None:
+        gui_window = ConsoleWindow()
+        gui_window.run()
+
+
+def quit_app(icon, item):
+    """Stops the script when exiting from the tray."""
+    global MONITORING
+    MONITORING = False
+    icon.stop()
+    log_message("[INFO] Notifier exited.")
+
+
+# Setup system tray menu
+menu = Menu(
+    MenuItem("Open Console", open_console),
+    MenuItem("Exit", quit_app)
+)
+
+# Create and run system tray icon
+icon = Icon("Contrast Notifier", create_icon(), menu=menu)
+
+# Start background thread
+thread = threading.Thread(target=background_task, daemon=True)
+thread.start()
+
+# Run the system tray application
+icon.run()
