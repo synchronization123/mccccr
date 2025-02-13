@@ -99,10 +99,14 @@ def create_icon():
     tray_icon.run()
 
 # Show GUI console
-def show_console(icon, item):
+def show_console(icon, item=None):
     root.deiconify()
 
-# Exit application
+# Hide GUI to system tray
+def hide_console():
+    root.withdraw()
+
+# Exit application completely
 def exit_app(icon, item):
     global running
     running = False
@@ -116,6 +120,9 @@ root.geometry("500x300")
 
 console_text = ScrolledText(root, wrap=tk.WORD, height=15)
 console_text.pack(fill=tk.BOTH, expand=True)
+
+# Override close button to hide instead of exit
+root.protocol("WM_DELETE_WINDOW", hide_console)
 
 # Hide window to system tray initially
 root.withdraw()
