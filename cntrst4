@@ -12,10 +12,11 @@ from PIL import Image, ImageDraw
 CONTRAST_API_URL = "https://app.contrastsecurity.com/Contrast/api/ng/org-id/traces"
 API_KEY = "your_api_key"
 AUTH_HEADER = {"Authorization": f"Bearer {API_KEY}"}
+QUERY_PARAMS = {"statuses": "Reported", "severities": "CRITICAL,HIGH,MEDIUM"}  # Ensure filtering
 
 # Severities to monitor
 SEVERITY_LEVELS = {"Medium", "High", "Critical"}
-LAST_TRACE_ID = None
+LAST_TRACE_IDS = set()
 MONITORING = True  # Flag to track monitoring state
 
 # GUI window reference
@@ -39,17 +40,20 @@ def log_message(message):
         gui_window.log_area.yview(tk.END)
 
 
-def get_latest_trace():
-    """Fetches the latest trace from Contrast API."""
+def get_latest_traces():
+    """Fetches the latest traces from Contrast API."""
     try:
-        response = requests.get(CONTRAST_API_URL, headers=AUTH_HEADER)
+        response = requests.get(CONTRAST_API_URL, headers=AUTH_HEADER, params=QUERY_PARAMS)
+        
         if response.status_code == 200:
             traces = response.json().get("traces", [])
-            if traces:
-                return traces[0]  # Get the newest trace
-        return None
-    except Exception:
-        return None  # No warnings or logs if API fails
+            return traces
+        else:
+            log_message(f"[WARNING] API Error: {response.status_code}")
+            return []
+    except Exception as e:
+        log_message(f"[ERROR] Failed to fetch traces: {str(e)}")
+        return []
 
 
 def notify_user(severity, title):
@@ -63,19 +67,19 @@ def notify_user(severity, title):
 
 def check_for_new_traces():
     """Checks for new traces and sends a notification if found."""
-    global LAST_TRACE_ID
-    latest_trace = get_latest_trace()
+    global LAST_TRACE_IDS
+    latest_traces = get_latest_traces()
 
-    if latest_trace:
-        trace_id = latest_trace["uuid"]
-        severity = latest_trace["severity"]
-        status = latest_trace["status"]
-        title = latest_trace["title"]
+    for trace in latest_traces:
+        trace_id = trace["uuid"]
+        severity = trace["severity"]
+        status = trace["status"]
+        title = trace["title"]
 
-        if status == "Reported" and severity in SEVERITY_LEVELS and trace_id != LAST_TRACE_ID:
+        if status == "Reported" and severity in SEVERITY_LEVELS and trace_id not in LAST_TRACE_IDS:
             log_message(f"[ALERT] New {severity} trace detected: {title}")
             notify_user(severity, title)
-            LAST_TRACE_ID = trace_id  # Update last processed trace
+            LAST_TRACE_IDS.add(trace_id)  # Store seen trace IDs
 
 
 def background_task():
