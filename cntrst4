@@ -1,49 +1,45 @@
-import time
-import json
 import requests
+import json
+import time
 import threading
 import tkinter as tk
-from tkinter import scrolledtext
+from tkinter.scrolledtext import ScrolledText
 from plyer import notification
-from pystray import Icon, MenuItem, Menu
+import pystray
+from pystray import MenuItem as item, Icon
 from PIL import Image, ImageDraw
 
-# 🔹 Contrast API Configuration
-ORG_UUID = "your_org_uuid"
-
+# API Configuration
+ORG_UUID = "your_correct_org_uuid"  # Replace with actual Org UUID
 CONTRAST_API_URL = f"https://app.contrastsecurity.com/ng/{ORG_UUID}/orgtraces/ids"
 
-# 🔹 Custom Headers
 HEADERS = {
-    "Authorization": "gdhdjdjdjddj=",  # Your Authorization Token
-    "Api-key": "jjjdjdj777",  # Your API Key
+    "Authorization": "Bearer YOUR_VALID_API_TOKEN",
+    "Api-key": "YOUR_VALID_API_KEY",
     "Accept": "application/json"
 }
 
-# Query Parameters
-PARAMS = {"severities": "CRITICAL,HIGH", "status": "REPORTED"}
+PARAMS = {
+    "severities": "CRITICAL,HIGH",
+    "status": "REPORTED"
+}
 
-# Store Seen Traces
-LAST_TRACE_IDS = set()
-MONITORING = True
-gui_window = None
+# Global variables
+initial_traces = set()  # Store initial trace IDs
+tray_icon = None  # System tray icon
+running = True  # Control the monitoring loop
 
-# 🔹 Function to Log Messages in GUI Console
-def log_message(message):
-    print(message)  # Print to console
-    if gui_window:
-        gui_window.log_area.insert(tk.END, message + "\n")
-        gui_window.log_area.yview(tk.END)
+# GUI Logger Function
+def log_message(msg):
+    console_text.insert(tk.END, msg + "\n")
+    console_text.yview(tk.END)
+    print(msg)
 
-# 🔹 Function to Fetch Latest Traces
+# Fetch latest reported traces
 def get_latest_traces():
-    """Fetch latest reported traces from Contrast API."""
     try:
-        log_message("[DEBUG] Checking Contrast Security API...")
         response = requests.get(CONTRAST_API_URL, headers=HEADERS, params=PARAMS)
-
-        log_message(f"[DEBUG] Response Code: {response.status_code}")
-        log_message(f"[DEBUG] Response Body: {response.text}")
+        log_message(f"[DEBUG] API Response Code: {response.status_code}")
 
         if response.status_code == 200:
             data = response.json()
@@ -52,110 +48,85 @@ def get_latest_traces():
             else:
                 log_message("[WARNING] API response success=False. Check API permissions.")
                 return set()
+        elif response.status_code == 403:
+            log_message("[ERROR] 403 Forbidden - Authorization failure. Check API Key & Token.")
         elif response.status_code == 401:
-            log_message("[ERROR] 401 Unauthorized. Check API Token, API Key, or Org UUID.")
-            return set()
+            log_message("[ERROR] 401 Unauthorized. Check API Token or Org UUID.")
         else:
             log_message(f"[ERROR] API Error: {response.status_code}")
-            return set()
     except Exception as e:
         log_message(f"[ERROR] Exception: {str(e)}")
-        return set()
+    return set()
 
-# 🔹 Function to Show Toast Notification
-def notify_user(severity):
-    """Displays a toast notification for new traces."""
-    notification.notify(
-        title=f"New {severity} Severity Trace Reported",
-        message="A new trace has been reported. Please check.",
-        timeout=10
-    )
+# Monitoring function
+def monitor_traces():
+    global initial_traces
 
-# 🔹 Function to Check for New Traces
-def check_for_new_traces():
-    """Checks for new traces and sends notifications if found."""
-    global LAST_TRACE_IDS
-    latest_traces = get_latest_traces()
+    log_message("[INFO] Fetching initial traces...")
+    initial_traces = get_latest_traces()
+    log_message(f"[INFO] Initial traces count: {len(initial_traces)}")
+    log_message(f"[INFO] Initial trace IDs: {list(initial_traces)}")
 
-    if not latest_traces:
-        log_message("[INFO] No new traces found.")
-        return
+    while running:
+        time.sleep(300)  # Check every 5 minutes
+        log_message("[INFO] Checking for new traces...")
 
-    new_traces = latest_traces - LAST_TRACE_IDS
-    if new_traces:
-        for trace_id in new_traces:
-            log_message(f"[ALERT] New trace detected: {trace_id}")
-            notify_user("High/Critical")
-        LAST_TRACE_IDS = latest_traces  # Update seen traces
+        latest_traces = get_latest_traces()
+        new_traces = latest_traces - initial_traces  # Find only added traces
 
-# 🔹 Background Monitoring Task
-def background_task():
-    """Runs trace checking every 5 minutes."""
-    while MONITORING:
-        log_message("[INFO] Monitoring Contrast Security for new traces...")
-        check_for_new_traces()
-        time.sleep(300)
+        if new_traces:
+            log_message(f"[ALERT] New traces detected: {len(new_traces)}")
+            log_message(f"[INFO] New Trace IDs: {list(new_traces)}")
+            for trace in new_traces:
+                notification.notify(
+                    title="Security Alert",
+                    message=f"A High/Critical trace has been reported! Trace ID: {trace}",
+                    timeout=5
+                )
+            initial_traces = latest_traces  # Update known traces
+        else:
+            log_message("[INFO] No new traces found.")
 
-# 🔹 GUI Console Window
-class ConsoleWindow:
-    """GUI Window to show log messages."""
-    def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("Contrast Notifier Console")
-        self.root.geometry("600x400")
-
-        self.log_area = scrolledtext.ScrolledText(self.root, wrap=tk.WORD, width=70, height=20)
-        self.log_area.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
-
-        close_button = tk.Button(self.root, text="Close", command=self.close_window)
-        close_button.pack(pady=5)
-
-    def close_window(self):
-        """Closes the GUI but keeps the script running."""
-        global gui_window
-        gui_window = None
-        self.root.destroy()
-
-    def run(self):
-        """Starts the GUI main loop."""
-        self.root.mainloop()
-
-# 🔹 Function to Open GUI Console
-def open_console():
-    """Opens the GUI console."""
-    global gui_window
-    if gui_window is None:
-        gui_window = ConsoleWindow()
-        gui_window.run()
-
-# 🔹 Function to Quit App from System Tray
-def quit_app(icon, item):
-    """Stops the script when exiting from the tray."""
-    global MONITORING
-    MONITORING = False
-    icon.stop()
-    log_message("[INFO] Notifier exited.")
-
-# 🔹 Create System Tray Icon
+# System tray icon
 def create_icon():
-    """Creates a system tray icon."""
-    image = Image.new("RGB", (64, 64), (255, 255, 255))
+    global tray_icon
+    image = Image.new("RGB", (64, 64), (255, 0, 0))
     draw = ImageDraw.Draw(image)
-    draw.rectangle((10, 10, 54, 54), fill="black")
-    return image
+    draw.rectangle((10, 10, 54, 54), fill=(255, 255, 255))
 
-# 🔹 System Tray Menu
-menu = Menu(
-    MenuItem("Open Console", open_console),
-    MenuItem("Exit", quit_app)
-)
+    menu = (item("Open Console", show_console), item("Exit", exit_app))
+    tray_icon = Icon("TraceMonitor", image, "Trace Monitor", menu)
+    tray_icon.run()
 
-# 🔹 Start System Tray Icon
-icon = Icon("Contrast Notifier", create_icon(), menu=menu)
+# Show GUI console
+def show_console(icon, item):
+    root.deiconify()
 
-# 🔹 Start Background Monitoring Thread
-thread = threading.Thread(target=background_task, daemon=True)
-thread.start()
+# Exit application
+def exit_app(icon, item):
+    global running
+    running = False
+    tray_icon.stop()
+    root.quit()
 
-# 🔹 Run System Tray Application
-icon.run()
+# GUI Setup
+root = tk.Tk()
+root.title("Trace Monitor")
+root.geometry("500x300")
+
+console_text = ScrolledText(root, wrap=tk.WORD, height=15)
+console_text.pack(fill=tk.BOTH, expand=True)
+
+# Hide window to system tray initially
+root.withdraw()
+
+# Start monitoring in a separate thread
+monitor_thread = threading.Thread(target=monitor_traces, daemon=True)
+monitor_thread.start()
+
+# Start system tray icon in a separate thread
+tray_thread = threading.Thread(target=create_icon, daemon=True)
+tray_thread.start()
+
+# Run GUI event loop
+root.mainloop()
