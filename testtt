@@ -41,66 +41,11 @@ def process_data():
         dict_data = data.set_index('Issue key').to_dict('index')
         jira_id = list(dict_data.keys())
 
-        security_comment, manual_testing, jira_type = [], [], []
-        why_manual_testing_not_required = []
-        securityJiraFilter = ['security', 'appsecurity', 'ram', 'dan', 'kan', 'van']
-
-        for key in dict_data:
-            flag_jira_type, flag_security_comment, flag_manual_testing = False, False, False
-            for key1 in dict_data[key]:
-                comment = str(dict_data[key][key1]).lower()
-
-                if not flag_security_comment and patch_id in comment and 'security validation' in comment:
-                    security_comment.append(comment.split('comments:')[1][:-3])
-                    flag_security_comment = True
-
-                    if 'manual testing:' in comment:
-                        manualTesting = comment.split('manual testing:')[1][:6]
-                        if not flag_manual_testing and 'done' in manualTesting:
-                            manual_testing.append('Done')
-                            flag_manual_testing = True
-
-                if not flag_jira_type and ('Component' in str(key1) or 'QA-TeamLead' in str(key1)):
-                    if comment.lower() in securityJiraFilter:
-                        flag_jira_type = True
-                        jira_type.append('Security Jira')
-
-            if not flag_jira_type:
-                jira_type.append('Functional Jira')
-            if not flag_security_comment:
-                security_comment.append('NA')
-            if not flag_manual_testing:
-                manual_testing.append('NA')
-
-            if manual_testing[-1] == 'Done':
-                why_manual_testing_not_required.append(' ')
-            elif jira_type[-1] == 'Functional Jira':
-                why_manual_testing_not_required.append(
-                    'It is a functional jira. Code review is done to check for security vulnerabilities'
-                )
-            elif jira_type[-1] == 'Security Jira':
-                why_manual_testing_not_required.append(
-                    'This security issue was observed during Code Review. Code review was done to find the security issue'
-                )
-            else:
-                why_manual_testing_not_required.append('NA')
-
-        df = pd.DataFrame({
-            'Jira ID': jira_id,
-            'Security Comment': security_comment,
-            'Jira Type': jira_type,
-            'Manual Testing': manual_testing,
-            'Why manual testing is not required?': why_manual_testing_not_required
-        })
-
-        # Save output CSV in hardcoded path
-        df.to_csv(output_csv_path, index=False)
-
+        # Fetch Build Name to Summary tab (B1)
         sheet = wb["Build Analysis"]
         summary_sheet = wb["Summary"]
         risk_register_sheet = wb["Risk Register"]
 
-        # Write Build Name (A3), Date (B3), and Total Time Taken (E3)
         sheet["A3"] = build_name
         sheet["B3"] = report_date
         sheet["E3"] = total_time
@@ -109,47 +54,13 @@ def process_data():
         username = os.getlogin().replace('.', ' ')
         sheet["D3"] = username.title()
 
-        # Copy Build Name to Summary sheet (B1)
         summary_sheet["B1"] = build_name
 
-        # Find the first empty row in column F (starting from F3)
-        start_row = 3
-        while sheet[f"F{start_row}"].value:
-            start_row += 1
-
-        # Track counts for Functional & Security Jira
-        functional_count = 0
-        security_count = 0
-
-        # Write values into respective columns
-        for i, (jira_id, jira_type, manual_testing, security_comment, why_manual_testing) in enumerate(
-                zip(df["Jira ID"], df["Jira Type"], df["Manual Testing"], df["Security Comment"],
-                    df["Why manual testing is not required?"]), start=start_row):
-
-            sheet[f"F{i}"] = jira_id
-            sheet[f"G{i}"] = jira_type
-            sheet[f"I{i}"] = manual_testing
-            sheet[f"J{i}"] = security_comment
-            sheet[f"K{i}"] = why_manual_testing
-
-            if jira_type == "Functional Jira":
-                functional_count += 1
-            elif jira_type == "Security Jira":
-                security_count += 1
-
-        # Count non-empty cells in column F starting from F3
-        total_filled = sum(1 for row in range(3, sheet.max_row + 1) if sheet[f"F{row}"].value)
-        sheet["C3"] = total_filled  
-
-        # Write Functional Jira count (C3) and Security Jira count (C4) in Summary tab
-        summary_sheet["C3"] = functional_count
-        summary_sheet["C4"] = security_count
-
-        # Save dropdown values to Risk Register sheet (starting from C3)
+        # Save dropdown values to Risk Register
         risk_register_sheet["C3"] = auth_value
         risk_register_sheet["C4"] = authz_value
 
-        # Save workbook with Build Name in hardcoded path
+        # Save workbook with Build Name
         wb.save(output_xlsx_path)
 
         status_label.config(text="Process Completed Successfully!", foreground="green")
@@ -169,34 +80,42 @@ def browse_csv():
 # Tkinter GUI
 root = Tk()
 root.title("JIRA Report Processor")
-root.geometry("550x400")
+root.geometry("600x400")
 root.resizable(False, False)
 
 # Labels and Inputs
 Label(root, text="Patch ID:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-entry_patch_id = Entry(root, width=40)
-entry_patch_id.grid(row=0, column=1)
+entry_patch_id = Entry(root, width=50)
+entry_patch_id.grid(row=0, column=1, padx=5)
 
 Label(root, text="Build Name:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
-entry_build_name = Entry(root, width=40)
-entry_build_name.grid(row=1, column=1)
+entry_build_name = Entry(root, width=50)
+entry_build_name.grid(row=1, column=1, padx=5)
 
 Label(root, text="Report Date:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
 date_picker = DateEntry(root, width=12, background="darkblue", foreground="white", date_pattern="yyyy-mm-dd")
-date_picker.grid(row=2, column=1)
+date_picker.grid(row=2, column=1, sticky="w")
 
 Label(root, text="Total Time Taken:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
-entry_total_time = Entry(root, width=40)
-entry_total_time.grid(row=3, column=1)
+entry_total_time = Entry(root, width=50)
+entry_total_time.grid(row=3, column=1, padx=5)
 
 Label(root, text="Authentication:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
-auth_combobox = ttk.Combobox(root, values=["NA", "Done", "Not Done"], width=37)
-auth_combobox.grid(row=4, column=1)
+auth_combobox = ttk.Combobox(root, values=["NA", "Done", "Not Done"], width=47)
+auth_combobox.grid(row=4, column=1, padx=5)
 
 Label(root, text="Authorization:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
-authz_combobox = ttk.Combobox(root, values=["NA", "Done", "Not Done"], width=37)
-authz_combobox.grid(row=5, column=1)
+authz_combobox = ttk.Combobox(root, values=["NA", "Done", "Not Done"], width=47)
+authz_combobox.grid(row=5, column=1, padx=5)
 
-Button(root, text="Process Data", command=process_data).grid(row=6, column=1, pady=20)
+Label(root, text="Select CSV File:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
+entry_csv = Entry(root, width=40)
+entry_csv.grid(row=6, column=1, padx=5, sticky="w")
+Button(root, text="Browse", command=browse_csv).grid(row=6, column=2, padx=5, pady=5)
+
+Button(root, text="Process Data", command=process_data, bg="blue", fg="white").grid(row=7, column=1, pady=20)
+
+status_label = Label(root, text="", fg="black")
+status_label.grid(row=8, column=1, pady=5)
 
 root.mainloop()
