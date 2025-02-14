@@ -1,16 +1,19 @@
 import os
 import pandas as pd
 from openpyxl import load_workbook
-from openpyxl.utils import get_column_letter
 from tkinter import filedialog, messagebox, ttk, Tk, Label, Entry, Button
+from tkcalendar import DateEntry
 
 # Function to process data
 def process_data():
     patch_id = entry_patch_id.get()
+    build_name = entry_build_name.get()
+    total_time = entry_total_time.get()
+    report_date = date_picker.get_date().strftime("%Y-%m-%d")
     file_path = entry_csv.get()
     final_report_path = entry_excel.get()
 
-    if not patch_id or not file_path or not final_report_path:
+    if not patch_id or not build_name or not total_time or not file_path or not final_report_path:
         messagebox.showerror("Error", "Please fill in all fields!")
         return
 
@@ -80,38 +83,49 @@ def process_data():
         # Load FinalReport workbook
         wb = load_workbook(final_report_path)
         sheet = wb["Build Analysis"]
+        summary_sheet = wb["Summary"]
 
-        # Find column indexes based on headers
-        header_row = 1  # Assuming headers are in the first row
-        headers = {cell.value: cell.column for cell in sheet[header_row] if cell.value}
+        # Write Build Name (A3), Date (B3), and Total Time Taken (E3)
+        sheet["A3"] = build_name
+        sheet["B3"] = report_date
+        sheet["E3"] = total_time
 
-        # Function to find top-left cell of merged range
-        def get_top_left_of_merged(sheet, row, col):
-            for merged_range in sheet.merged_cells.ranges:
-                if (row, col) in merged_range.cells:
-                    return merged_range.min_row, merged_range.min_col
-            return row, col
+        # Find the first empty row in column F (starting from F3)
+        start_row = 3
+        f_column = 'F'
+        while sheet[f"{f_column}{start_row}"].value:
+            start_row += 1
+
+        # Track counts for Functional & Security Jira
+        functional_count = 0
+        security_count = 0
 
         # Write values into respective columns
-        for i, jira_id in enumerate(df["Jira ID"], start=3):
-            row, col = get_top_left_of_merged(sheet, i, headers["Issue Key (JIRA ID)"])
-            sheet.cell(row=row, column=col, value=jira_id)
+        for i, (jira_id, jira_type, manual_testing, security_comment, why_manual_testing) in enumerate(
+                zip(df["Jira ID"], df["Jira Type"], df["Manual Testing"], df["Security Comment"],
+                    df["Why manual testing is not required?"]), start=start_row):
 
-        for i, jira_type in enumerate(df["Jira Type"], start=3):
+            sheet[f"F{i}"] = jira_id
             sheet[f"G{i}"] = jira_type
-
-        for i, manual_testing in enumerate(df["Manual Testing"], start=3):
             sheet[f"I{i}"] = manual_testing
-
-        for i, security_comment in enumerate(df["Security Comment"], start=3):
             sheet[f"J{i}"] = security_comment
+            sheet[f"K{i}"] = why_manual_testing
 
-        for i, why_manual_testing_not_required in enumerate(df["Why manual testing is not required?"], start=3):
-            sheet[f"K{i}"] = why_manual_testing_not_required
+            if jira_type == "Functional Jira":
+                functional_count += 1
+            elif jira_type == "Security Jira":
+                security_count += 1
 
-        # Updating counts
-        sheet["C3"] = len(jira_id)
+        # Dynamically count non-empty cells in column F starting from F3
+        total_filled = sum(1 for row in range(3, sheet.max_row + 1) if sheet[f"F{row}"].value)
+        sheet["C3"] = total_filled  # Update C3 with total filled cells in column F
+
+        # Store username in D3
         sheet["D3"] = os.getlogin().replace('.', ' ')
+
+        # Write Functional Jira count (C3) and Security Jira count (C4) in Summary tab
+        summary_sheet["C3"] = functional_count
+        summary_sheet["C4"] = security_count
 
         # Save workbook
         wb.save(final_report_path)
@@ -140,32 +154,39 @@ def browse_excel():
 # Tkinter GUI
 root = Tk()
 root.title("JIRA Report Processor")
-root.geometry("500x300")
+root.geometry("550x350")
 root.resizable(False, False)
 
-# Styling
-style = ttk.Style()
-style.configure("TButton", font=("Arial", 10), padding=5)
-style.configure("TLabel", font=("Arial", 10))
-
-# Layout using Grid for proper alignment
-Label(root, text="Enter APU-ID (Patch ID):").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+# Layout using Grid
+Label(root, text="APU-ID (Patch ID):").grid(row=0, column=0, padx=10, pady=5, sticky="w")
 entry_patch_id = Entry(root, width=40)
 entry_patch_id.grid(row=0, column=1, padx=10, pady=5, columnspan=2)
 
-Label(root, text="Select CSV Dump File:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+Label(root, text="Build Name:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+entry_build_name = Entry(root, width=40)
+entry_build_name.grid(row=1, column=1, padx=10, pady=5, columnspan=2)
+
+Label(root, text="Report Date:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+date_picker = DateEntry(root, width=12, background="darkblue", foreground="white", date_pattern="yyyy-mm-dd")
+date_picker.grid(row=2, column=1, padx=10, pady=5)
+
+Label(root, text="Total Time Taken:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+entry_total_time = Entry(root, width=40)
+entry_total_time.grid(row=3, column=1, padx=10, pady=5, columnspan=2)
+
+Label(root, text="Select CSV File:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
 entry_csv = Entry(root, width=30)
-entry_csv.grid(row=1, column=1, padx=10, pady=5)
-Button(root, text="Browse", command=browse_csv).grid(row=1, column=2, padx=10, pady=5)
+entry_csv.grid(row=4, column=1, padx=10, pady=5)
+Button(root, text="Browse", command=browse_csv).grid(row=4, column=2)
 
-Label(root, text="Select FinalReport Excel File:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+Label(root, text="Select Excel File:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
 entry_excel = Entry(root, width=30)
-entry_excel.grid(row=2, column=1, padx=10, pady=5)
-Button(root, text="Browse", command=browse_excel).grid(row=2, column=2, padx=10, pady=5)
+entry_excel.grid(row=5, column=1, padx=10, pady=5)
+Button(root, text="Browse", command=browse_excel).grid(row=5, column=2)
 
-Button(root, text="Process Data", command=process_data).grid(row=3, column=1, pady=20)
+Button(root, text="Process Data", command=process_data).grid(row=6, column=1, pady=20)
 
 status_label = Label(root, text="", font=("Arial", 10, "bold"))
-status_label.grid(row=4, column=1, pady=5)
+status_label.grid(row=7, column=1, pady=5)
 
 root.mainloop()
