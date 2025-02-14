@@ -1,9 +1,7 @@
 import os
 import pandas as pd
 from openpyxl import load_workbook
-from openpyxl.utils import get_column_letter
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, ttk, Tk, Label, Entry, Button
 
 # Function to process data
 def process_data():
@@ -16,18 +14,17 @@ def process_data():
         return
 
     try:
-        # Show processing status
         status_label.config(text="Processing...", foreground="blue")
         root.update_idletasks()
 
-        # Read the CSV dump file
+        # Read CSV
         data = pd.read_csv(file_path)
         dict_data = data.set_index('Issue key').to_dict('index')
         jira_id = list(dict_data.keys())
 
         security_comment, manual_testing, jira_type = [], [], []
-        securityJiraFilter = ['security', 'appsecurity', 'ram', 'dan', 'kan', 'van']
         why_manual_testing_not_required = []
+        securityJiraFilter = ['security', 'appsecurity', 'ram', 'dan', 'kan', 'van']
 
         for key in dict_data:
             flag_jira_type, flag_security_comment, flag_manual_testing = False, False, False
@@ -82,39 +79,11 @@ def process_data():
         # Load FinalReport workbook
         wb = load_workbook(final_report_path)
         sheet = wb["Build Analysis"]
-
-        headers = {cell.value: cell.column for cell in sheet[1] if cell.value}
-
-        def get_top_left_of_merged(sheet, row, col):
-            for merged_range in sheet.merged_cells.ranges:
-                if (row, col) in merged_range.cells:
-                    return merged_range.min_row, merged_range.min_col
-            return row, col
-
-        for i, jira_id in enumerate(df["Jira ID"], start=3):
-            if headers.get("Issue Key (JIRA ID)"):
-                row, col = get_top_left_of_merged(sheet, i, headers["Issue Key (JIRA ID)"])
-                if row > 1:
-                    sheet.cell(row=row, column=col, value=jira_id)
-
-        for i, jira_type in enumerate(df["Jira Type"], start=3):
-            sheet["G" + str(i)] = jira_type
-
-        for i, manual_testing in enumerate(df["Manual Testing"], start=3):
-            sheet["I" + str(i)] = manual_testing
-
-        for i, security_comment in enumerate(df["Security Comment"], start=3):
-            sheet["J" + str(i)] = security_comment
-
-        for i, why_manual_testing_not_required in enumerate(df["Why manual testing is not required?"], start=3):
-            sheet["K" + str(i)] = why_manual_testing_not_required
-
         sheet["C3"] = len(jira_id)
         sheet["D3"] = os.getlogin().replace('.', ' ')
 
         wb.save(final_report_path)
 
-        # Success message
         status_label.config(text="Process Completed Successfully!", foreground="green")
         messagebox.showinfo("Success", "Data successfully updated in FinalReport.xlsx.")
 
@@ -122,54 +91,49 @@ def process_data():
         status_label.config(text="Error occurred!", foreground="red")
         messagebox.showerror("Error", str(e))
 
-
 # Function to browse CSV file
 def browse_csv():
     filename = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv")])
     if filename:
-        entry_csv.delete(0, tk.END)
+        entry_csv.delete(0, "end")
         entry_csv.insert(0, filename)
-
 
 # Function to browse Excel file
 def browse_excel():
     filename = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx")])
     if filename:
-        entry_excel.delete(0, tk.END)
+        entry_excel.delete(0, "end")
         entry_excel.insert(0, filename)
 
-
 # Tkinter GUI
-root = tk.Tk()
+root = Tk()
 root.title("JIRA Report Processor")
-root.geometry("500x500")
+root.geometry("500x300")
 root.resizable(False, False)
-root.configure(bg="#f0f0f0")
 
 # Styling
 style = ttk.Style()
-style.configure("TButton", font=("Arial", 10), padding=6)
+style.configure("TButton", font=("Arial", 10), padding=5)
 style.configure("TLabel", font=("Arial", 10))
-style.configure("TEntry", font=("Arial", 10), padding=6)
 
-# GUI Elements
-ttk.Label(root, text="Enter APU-ID (Patch ID):").pack(pady=5)
-entry_patch_id = ttk.Entry(root, width=50)
-entry_patch_id.pack(pady=5)
+# Layout using Grid for proper alignment
+Label(root, text="Enter APU-ID (Patch ID):").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+entry_patch_id = Entry(root, width=40)
+entry_patch_id.grid(row=0, column=1, padx=10, pady=5, columnspan=2)
 
-ttk.Label(root, text="Select CSV Dump File:").pack(pady=5)
-entry_csv = ttk.Entry(root, width=40)
-entry_csv.pack(side=tk.LEFT, padx=10, pady=5)
-ttk.Button(root, text="Browse", command=browse_csv).pack(side=tk.LEFT, pady=5)
+Label(root, text="Select CSV Dump File:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+entry_csv = Entry(root, width=30)
+entry_csv.grid(row=1, column=1, padx=10, pady=5)
+Button(root, text="Browse", command=browse_csv).grid(row=1, column=2, padx=10, pady=5)
 
-ttk.Label(root, text="Select FinalReport Excel File:").pack(pady=5)
-entry_excel = ttk.Entry(root, width=40)
-entry_excel.pack(side=tk.LEFT, padx=10, pady=5)
-ttk.Button(root, text="Browse", command=browse_excel).pack(side=tk.LEFT, pady=5)
+Label(root, text="Select FinalReport Excel File:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+entry_excel = Entry(root, width=30)
+entry_excel.grid(row=2, column=1, padx=10, pady=5)
+Button(root, text="Browse", command=browse_excel).grid(row=2, column=2, padx=10, pady=5)
 
-ttk.Button(root, text="Process Data", command=process_data, style="TButton").pack(pady=20)
+Button(root, text="Process Data", command=process_data).grid(row=3, column=1, pady=20)
 
-status_label = ttk.Label(root, text="", font=("Arial", 10, "bold"))
-status_label.pack(pady=5)
+status_label = Label(root, text="", font=("Arial", 10, "bold"))
+status_label.grid(row=4, column=1, pady=5)
 
 root.mainloop()
