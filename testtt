@@ -1,0 +1,185 @@
+import os
+import json
+import pandas as pd
+from openpyxl import load_workbook
+from tkinter import filedialog, messagebox, Tk, Label, Entry, Button, Menu
+from tkcalendar import DateEntry
+
+# Configuration file path
+CONFIG_PATH = "C://windows/user/parch/reportconfig.json"
+
+# Ensure the config directory exists
+os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+
+# Load configuration from JSON
+def load_config():
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH, "r") as file:
+            return json.load(file)
+    return {}
+
+# Save configuration to JSON
+def save_config(config):
+    with open(CONFIG_PATH, "w") as file:
+        json.dump(config, file, indent=4)
+
+# Open configuration window
+def open_config():
+    config_window = Tk()
+    config_window.title("Configuration")
+    config_window.geometry("500x250")
+
+    Label(config_window, text="Template Path:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+    entry_template = Entry(config_window, width=50)
+    entry_template.grid(row=0, column=1, padx=10, pady=5)
+
+    Label(config_window, text="Output CSV Path:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+    entry_csv = Entry(config_window, width=50)
+    entry_csv.grid(row=1, column=1, padx=10, pady=5)
+
+    Label(config_window, text="Output XLSX Path:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+    entry_xlsx = Entry(config_window, width=50)
+    entry_xlsx.grid(row=2, column=1, padx=10, pady=5)
+
+    # Browse functions
+    def browse_template():
+        path = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx")])
+        if path:
+            entry_template.delete(0, "end")
+            entry_template.insert(0, path)
+
+    def browse_csv():
+        path = filedialog.askdirectory()
+        if path:
+            entry_csv.delete(0, "end")
+            entry_csv.insert(0, path)
+
+    def browse_xlsx():
+        path = filedialog.askdirectory()
+        if path:
+            entry_xlsx.delete(0, "end")
+            entry_xlsx.insert(0, path)
+
+    Button(config_window, text="Browse", command=browse_template).grid(row=0, column=2, padx=5)
+    Button(config_window, text="Browse", command=browse_csv).grid(row=1, column=2, padx=5)
+    Button(config_window, text="Browse", command=browse_xlsx).grid(row=2, column=2, padx=5)
+
+    # Save configuration
+    def save():
+        config = {
+            "template_path": entry_template.get(),
+            "output_csv_path": entry_csv.get(),
+            "output_xlsx_path": entry_xlsx.get()
+        }
+        save_config(config)
+        messagebox.showinfo("Success", "Configuration Saved Successfully!")
+        config_window.destroy()
+
+    Button(config_window, text="Save", command=save).grid(row=3, column=1, pady=20)
+
+    config_window.mainloop()
+
+# Main processing function
+def process_data():
+    config = load_config()
+
+    if not config.get("template_path") or not config.get("output_csv_path") or not config.get("output_xlsx_path"):
+        messagebox.showerror("Error", "Please configure file paths first!")
+        return
+
+    patch_id = entry_patch_id.get().strip()
+    build_name = entry_build_name.get().strip()
+    total_time = entry_total_time.get().strip()
+    report_date = date_picker.get_date().strftime("%Y-%m-%d")
+    file_path = entry_csv.get().strip()
+    template_path = config["template_path"]
+    output_csv_path = os.path.join(config["output_csv_path"], "output.csv")
+    output_xlsx_path = os.path.join(config["output_xlsx_path"], f"{build_name}.xlsx")
+
+    if not patch_id or not build_name or not total_time or not file_path:
+        messagebox.showerror("Error", "Please fill in all fields!")
+        return
+
+    try:
+        status_label.config(text="Processing...", foreground="blue")
+        root.update_idletasks()
+
+        # Load report template
+        if not os.path.exists(template_path):
+            messagebox.showerror("Error", f"Template file not found: {template_path}")
+            return
+
+        # Ensure the output directories exist
+        os.makedirs(config["output_csv_path"], exist_ok=True)
+        os.makedirs(config["output_xlsx_path"], exist_ok=True)
+
+        wb = load_workbook(template_path)
+        data = pd.read_csv(file_path)
+        df = data[['Issue key', 'Comments', 'Component']].copy()
+
+        df.to_csv(output_csv_path, index=False)
+
+        sheet = wb["Build Analysis"]
+        summary_sheet = wb["Summary"]
+
+        sheet["A3"] = build_name
+        sheet["B3"] = report_date
+        sheet["E3"] = total_time
+        sheet["D3"] = os.getlogin().title()
+
+        summary_sheet["B1"] = build_name
+
+        wb.save(output_xlsx_path)
+
+        status_label.config(text="Process Completed Successfully!", foreground="green")
+        messagebox.showinfo("Success", f"Report saved as: {output_xlsx_path}")
+
+    except Exception as e:
+        status_label.config(text="Error occurred!", foreground="red")
+        messagebox.showerror("Error", str(e))
+
+# Function to browse CSV file
+def browse_csv():
+    filename = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv")])
+    if filename:
+        entry_csv.delete(0, "end")
+        entry_csv.insert(0, filename)
+
+# Tkinter GUI
+root = Tk()
+root.title("JIRA Report Processor")
+root.geometry("550x320")
+root.resizable(False, False)
+
+# Menu Bar
+menu_bar = Menu(root)
+root.config(menu=menu_bar)
+menu_bar.add_command(label="Configuration", command=open_config)
+
+Label(root, text="Patch ID:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+entry_patch_id = Entry(root, width=40)
+entry_patch_id.grid(row=0, column=1, padx=10, pady=5)
+
+Label(root, text="Build Name:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+entry_build_name = Entry(root, width=40)
+entry_build_name.grid(row=1, column=1, padx=10, pady=5)
+
+Label(root, text="Report Date:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+date_picker = DateEntry(root, width=12, background="darkblue", foreground="white", date_pattern="yyyy-mm-dd")
+date_picker.grid(row=2, column=1, padx=10, pady=5)
+
+Label(root, text="Total Time Taken:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+entry_total_time = Entry(root, width=40)
+entry_total_time.grid(row=3, column=1, padx=10, pady=5)
+
+Label(root, text="Select CSV File:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+entry_csv = Entry(root, width=30)
+entry_csv.grid(row=4, column=1, padx=10, pady=5)
+Button(root, text="Browse", command=browse_csv).grid(row=4, column=2)
+
+Button(root, text="Process Data", command=process_data).grid(row=5, column=1, pady=20)
+
+status_label = Label(root, text="", font=("Arial", 10, "bold"))
+status_label.grid(row=6, column=1, pady=5)
+
+root.mainloop()
