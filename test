@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
 from tkinter import filedialog, messagebox, ttk, Tk, Label, Entry, Button
 
 # Function to process data
@@ -79,9 +80,40 @@ def process_data():
         # Load FinalReport workbook
         wb = load_workbook(final_report_path)
         sheet = wb["Build Analysis"]
+
+        # Find column indexes based on headers
+        header_row = 1  # Assuming headers are in the first row
+        headers = {cell.value: cell.column for cell in sheet[header_row] if cell.value}
+
+        # Function to find top-left cell of merged range
+        def get_top_left_of_merged(sheet, row, col):
+            for merged_range in sheet.merged_cells.ranges:
+                if (row, col) in merged_range.cells:
+                    return merged_range.min_row, merged_range.min_col
+            return row, col
+
+        # Write values into respective columns
+        for i, jira_id in enumerate(df["Jira ID"], start=3):
+            row, col = get_top_left_of_merged(sheet, i, headers["Issue Key (JIRA ID)"])
+            sheet.cell(row=row, column=col, value=jira_id)
+
+        for i, jira_type in enumerate(df["Jira Type"], start=3):
+            sheet[f"G{i}"] = jira_type
+
+        for i, manual_testing in enumerate(df["Manual Testing"], start=3):
+            sheet[f"I{i}"] = manual_testing
+
+        for i, security_comment in enumerate(df["Security Comment"], start=3):
+            sheet[f"J{i}"] = security_comment
+
+        for i, why_manual_testing_not_required in enumerate(df["Why manual testing is not required?"], start=3):
+            sheet[f"K{i}"] = why_manual_testing_not_required
+
+        # Updating counts
         sheet["C3"] = len(jira_id)
         sheet["D3"] = os.getlogin().replace('.', ' ')
 
+        # Save workbook
         wb.save(final_report_path)
 
         status_label.config(text="Process Completed Successfully!", foreground="green")
