@@ -12,6 +12,7 @@ def process_data():
     report_date = date_picker.get_date().strftime("%Y-%m-%d")
     file_path = entry_csv.get().strip()
     template_path = "C://user//template//report.xlsx"
+    output_csv_path = "C://user/patch/output.csv"
 
     if not patch_id or not build_name or not total_time or not file_path:
         messagebox.showerror("Error", "Please fill in all fields!")
@@ -86,8 +87,10 @@ def process_data():
             'Why manual testing is not required?': why_manual_testing_not_required
         })
 
-        # Save output CSV in current directory
-        output_csv_path = os.path.join(os.getcwd(), "output.csv")
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_csv_path), exist_ok=True)
+        
+        # Save output CSV in hardcoded path
         df.to_csv(output_csv_path, index=False)
 
         sheet = wb["Build Analysis"]
