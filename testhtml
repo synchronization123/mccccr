@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JIRA Report Processor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            text-align: center;
+            padding: 20px;
+        }
+        .container {
+            width: 500px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            margin: auto;
+        }
+        h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .input-group {
+            margin: 10px 0;
+            text-align: left;
+        }
+        .input-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .input-group input[type="file"] {
+            padding: 3px;
+        }
+        button {
+            background: #28a745;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 15px;
+        }
+        button:hover {
+            background: #218838;
+        }
+        #status {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>JIRA Report Processor</h2>
+
+    <div class="input-group">
+        <label for="patchId">APU-ID (Patch ID):</label>
+        <input type="text" id="patchId">
+    </div>
+
+    <div class="input-group">
+        <label for="buildName">Build Name:</label>
+        <input type="text" id="buildName">
+    </div>
+
+    <div class="input-group">
+        <label for="reportDate">Report Date:</label>
+        <input type="date" id="reportDate">
+    </div>
+
+    <div class="input-group">
+        <label for="totalTime">Total Time Taken:</label>
+        <input type="text" id="totalTime">
+    </div>
+
+    <div class="input-group">
+        <label for="csvFile">Select CSV File:</label>
+        <input type="file" id="csvFile" accept=".csv">
+    </div>
+
+    <button onclick="processData()">Process Data</button>
+
+    <p id="status"></p>
+</div>
+
+<script>
+    function processData() {
+        let patchId = document.getElementById("patchId").value.trim();
+        let buildName = document.getElementById("buildName").value.trim();
+        let totalTime = document.getElementById("totalTime").value.trim();
+        let reportDate = document.getElementById("reportDate").value;
+        let fileInput = document.getElementById("csvFile");
+        
+        if (!patchId || !buildName || !totalTime || !reportDate || !fileInput.files.length) {
+            document.getElementById("status").innerHTML = "Error: Please fill in all fields!";
+            document.getElementById("status").style.color = "red";
+            return;
+        }
+
+        let file = fileInput.files[0];
+        let reader = new FileReader();
+
+        reader.onload = function(event) {
+            let csvData = event.target.result;
+            let rows = csvData.split("\n").slice(1); // Remove header row
+
+            let functionalCount = 0, securityCount = 0;
+            let csvOutput = "Jira ID, Security Comment, Jira Type, Manual Testing, Why Manual Testing Not Required?\n";
+
+            let securityJiraFilter = ["security", "appsecurity", "ram", "dan", "kan", "van"];
+
+            rows.forEach(row => {
+                let columns = row.split(",");
+                let jiraId = columns[0] || "NA";
+                let jiraType = "Functional Jira";
+                let securityComment = "NA";
+                let manualTesting = "NA";
+                let whyManualTestingNotRequired = "NA";
+
+                columns.forEach(col => {
+                    let value = col.trim().toLowerCase();
+                    if (securityJiraFilter.includes(value)) {
+                        jiraType = "Security Jira";
+                    }
+                    if (patchId && value.includes(patchId) && value.includes("security validation")) {
+                        securityComment = value.split("comments:")[1]?.slice(0, -3) || "NA";
+                    }
+                    if (value.includes("manual testing:")) {
+                        manualTesting = value.split("manual testing:")[1]?.slice(0, 6) || "NA";
+                    }
+                });
+
+                if (manualTesting === "Done") {
+                    whyManualTestingNotRequired = "";
+                } else if (jiraType === "Functional Jira") {
+                    whyManualTestingNotRequired = "Functional Jira: Code review done to check security vulnerabilities";
+                } else {
+                    whyManualTestingNotRequired = "Security issue found in code review";
+                }
+
+                if (jiraType === "Functional Jira") functionalCount++;
+                if (jiraType === "Security Jira") securityCount++;
+
+                csvOutput += `${jiraId},${securityComment},${jiraType},${manualTesting},${whyManualTestingNotRequired}\n`;
+            });
+
+            saveFile(csvOutput, "C://user/patch/output.csv");
+
+            document.getElementById("status").innerHTML = "Process Completed Successfully!";
+            document.getElementById("status").style.color = "green";
+        };
+
+        reader.readAsText(file);
+    }
+
+    function saveFile(content, filePath) {
+        let blob = new Blob([content], { type: "text/csv" });
+        let a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = filePath.split("/").pop();
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+</script>
+
+</body>
+</html>
