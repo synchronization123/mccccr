@@ -4,16 +4,14 @@ from openpyxl import load_workbook
 from tkinter import filedialog, messagebox, Tk, Label, Entry, Button
 from tkcalendar import DateEntry
 
-# Get current script directory
-script_dir = os.path.dirname(os.path.abspath(__file__))
-
+# Function to process data
 def process_data():
     patch_id = entry_patch_id.get().strip()
     build_name = entry_build_name.get().strip()
     total_time = entry_total_time.get().strip()
     report_date = date_picker.get_date().strftime("%Y-%m-%d")
     file_path = entry_csv.get().strip()
-    template_path = os.path.join("C://user//template//report.xlsx")
+    template_path = "C://user//template//report.xlsx"
 
     if not patch_id or not build_name or not total_time or not file_path:
         messagebox.showerror("Error", "Please fill in all fields!")
@@ -23,15 +21,12 @@ def process_data():
         status_label.config(text="Processing...", foreground="blue")
         root.update_idletasks()
 
-        # Ensure template file exists
+        # Load report template
         if not os.path.exists(template_path):
             messagebox.showerror("Error", f"Template file not found: {template_path}")
             return
 
-        # Fix: Save Report in Current Script Directory
-        final_report_path = os.path.join(script_dir, f"{build_name}.xlsx")
-
-        # Load template
+        final_report_path = os.path.join(os.getcwd(), f"{build_name}.xlsx")
         wb = load_workbook(template_path)
 
         # Read CSV
@@ -91,42 +86,35 @@ def process_data():
             'Why manual testing is not required?': why_manual_testing_not_required
         })
 
-        # Fix: Save CSV in Script Directory, Not System32
-        output_csv_path = os.path.join(script_dir, "output.csv")
-
-        if os.path.exists(output_csv_path):
-            os.remove(output_csv_path)
-
-        with open(output_csv_path, "w+", newline='', encoding="utf-8") as f:
-            df.to_csv(f, index=False)
-
-        os.chmod(output_csv_path, 0o777)
+        # Save output CSV in current directory
+        output_csv_path = os.path.join(os.getcwd(), "output.csv")
+        df.to_csv(output_csv_path, index=False)
 
         sheet = wb["Build Analysis"]
         summary_sheet = wb["Summary"]
 
-        # Write values in Build Analysis Sheet
+        # Write Build Name (A3), Date (B3), and Total Time Taken (E3)
         sheet["A3"] = build_name
         sheet["B3"] = report_date
         sheet["E3"] = total_time
 
-        # Format D3 (Title Case)
+        # Format D3: Convert to Title Case
         username = os.getlogin().replace('.', ' ')
         sheet["D3"] = username.title()
 
         # Copy Build Name to Summary sheet (B1)
         summary_sheet["B1"] = build_name
 
-        # Count Functional & Security Jira
-        functional_count = 0
-        security_count = 0
-
-        # Find first empty row in column F (starting from F3)
+        # Find the first empty row in column F (starting from F3)
         start_row = 3
         while sheet[f"F{start_row}"].value:
             start_row += 1
 
-        # Write values into columns
+        # Track counts for Functional & Security Jira
+        functional_count = 0
+        security_count = 0
+
+        # Write values into respective columns
         for i, (jira_id, jira_type, manual_testing, security_comment, why_manual_testing) in enumerate(
                 zip(df["Jira ID"], df["Jira Type"], df["Manual Testing"], df["Security Comment"],
                     df["Why manual testing is not required?"]), start=start_row):
@@ -142,18 +130,16 @@ def process_data():
             elif jira_type == "Security Jira":
                 security_count += 1
 
-        # Count filled cells in column F from F3 onwards
+        # Count non-empty cells in column F starting from F3
         total_filled = sum(1 for row in range(3, sheet.max_row + 1) if sheet[f"F{row}"].value)
         sheet["C3"] = total_filled  
 
-        # Write Summary counts
+        # Write Functional Jira count (C3) and Security Jira count (C4) in Summary tab
         summary_sheet["C3"] = functional_count
         summary_sheet["C4"] = security_count
 
-        # Fix: Save Report in Script Directory, Not System32
+        # Save workbook with Build Name
         wb.save(final_report_path)
-
-        os.chmod(final_report_path, 0o777)
 
         status_label.config(text="Process Completed Successfully!", foreground="green")
         messagebox.showinfo("Success", f"Report saved as: {final_report_path}")
@@ -162,18 +148,20 @@ def process_data():
         status_label.config(text="Error occurred!", foreground="red")
         messagebox.showerror("Error", str(e))
 
-# Browse CSV File
+# Function to browse CSV file
 def browse_csv():
     filename = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv")])
     if filename:
         entry_csv.delete(0, "end")
         entry_csv.insert(0, filename)
 
-# GUI
+# Tkinter GUI
 root = Tk()
 root.title("JIRA Report Processor")
 root.geometry("550x320")
+root.resizable(False, False)
 
+# Layout using Grid
 Label(root, text="APU-ID (Patch ID):").grid(row=0, column=0, padx=10, pady=5, sticky="w")
 entry_patch_id = Entry(root, width=40)
 entry_patch_id.grid(row=0, column=1, padx=10, pady=5)
@@ -190,7 +178,13 @@ Label(root, text="Total Time Taken:").grid(row=3, column=0, padx=10, pady=5, sti
 entry_total_time = Entry(root, width=40)
 entry_total_time.grid(row=3, column=1, padx=10, pady=5)
 
+Label(root, text="Select CSV File:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+entry_csv = Entry(root, width=30)
+entry_csv.grid(row=4, column=1, padx=10, pady=5)
+Button(root, text="Browse", command=browse_csv).grid(row=4, column=2)
+
 Button(root, text="Process Data", command=process_data).grid(row=5, column=1, pady=20)
+
 status_label = Label(root, text="", font=("Arial", 10, "bold"))
 status_label.grid(row=6, column=1, pady=5)
 
