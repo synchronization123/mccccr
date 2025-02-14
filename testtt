@@ -1,100 +1,22 @@
 import os
-import json
 import pandas as pd
 from openpyxl import load_workbook
-from tkinter import filedialog, messagebox, Tk, Label, Entry, Button, Menu
+from tkinter import filedialog, messagebox, Tk, Label, Entry, Button, ttk
 from tkcalendar import DateEntry
 
-# Configuration file path
-CONFIG_PATH = "C://windows/user/parch/reportconfig.json"
-
-# Ensure the config directory exists
-os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
-
-# Load configuration from JSON
-def load_config():
-    if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, "r") as file:
-            return json.load(file)
-    return {}
-
-# Save configuration to JSON
-def save_config(config):
-    with open(CONFIG_PATH, "w") as file:
-        json.dump(config, file, indent=4)
-
-# Open configuration window
-def open_config():
-    config_window = Tk()
-    config_window.title("Configuration")
-    config_window.geometry("500x250")
-
-    Label(config_window, text="Template Path:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-    entry_template = Entry(config_window, width=50)
-    entry_template.grid(row=0, column=1, padx=10, pady=5)
-
-    Label(config_window, text="Output CSV Path:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
-    entry_csv = Entry(config_window, width=50)
-    entry_csv.grid(row=1, column=1, padx=10, pady=5)
-
-    Label(config_window, text="Output XLSX Path:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
-    entry_xlsx = Entry(config_window, width=50)
-    entry_xlsx.grid(row=2, column=1, padx=10, pady=5)
-
-    # Browse functions
-    def browse_template():
-        path = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx")])
-        if path:
-            entry_template.delete(0, "end")
-            entry_template.insert(0, path)
-
-    def browse_csv():
-        path = filedialog.askdirectory()
-        if path:
-            entry_csv.delete(0, "end")
-            entry_csv.insert(0, path)
-
-    def browse_xlsx():
-        path = filedialog.askdirectory()
-        if path:
-            entry_xlsx.delete(0, "end")
-            entry_xlsx.insert(0, path)
-
-    Button(config_window, text="Browse", command=browse_template).grid(row=0, column=2, padx=5)
-    Button(config_window, text="Browse", command=browse_csv).grid(row=1, column=2, padx=5)
-    Button(config_window, text="Browse", command=browse_xlsx).grid(row=2, column=2, padx=5)
-
-    # Save configuration
-    def save():
-        config = {
-            "template_path": entry_template.get(),
-            "output_csv_path": entry_csv.get(),
-            "output_xlsx_path": entry_xlsx.get()
-        }
-        save_config(config)
-        messagebox.showinfo("Success", "Configuration Saved Successfully!")
-        config_window.destroy()
-
-    Button(config_window, text="Save", command=save).grid(row=3, column=1, pady=20)
-
-    config_window.mainloop()
-
-# Main processing function
+# Function to process data
 def process_data():
-    config = load_config()
-
-    if not config.get("template_path") or not config.get("output_csv_path") or not config.get("output_xlsx_path"):
-        messagebox.showerror("Error", "Please configure file paths first!")
-        return
-
     patch_id = entry_patch_id.get().strip()
     build_name = entry_build_name.get().strip()
     total_time = entry_total_time.get().strip()
     report_date = date_picker.get_date().strftime("%Y-%m-%d")
     file_path = entry_csv.get().strip()
-    template_path = config["template_path"]
-    output_csv_path = os.path.join(config["output_csv_path"], "output.csv")
-    output_xlsx_path = os.path.join(config["output_xlsx_path"], f"{build_name}.xlsx")
+    auth_value = auth_dropdown.get()
+    authz_value = authz_dropdown.get()
+    
+    template_path = "C://user//template//report.xlsx"
+    output_csv_path = "C://user/patch/output.csv"
+    output_xlsx_path = f"C://user/patch/{build_name}.xlsx"
 
     if not patch_id or not build_name or not total_time or not file_path:
         messagebox.showerror("Error", "Please fill in all fields!")
@@ -109,26 +31,117 @@ def process_data():
             messagebox.showerror("Error", f"Template file not found: {template_path}")
             return
 
-        # Ensure the output directories exist
-        os.makedirs(config["output_csv_path"], exist_ok=True)
-        os.makedirs(config["output_xlsx_path"], exist_ok=True)
+        os.makedirs(os.path.dirname(output_csv_path), exist_ok=True)
 
         wb = load_workbook(template_path)
-        data = pd.read_csv(file_path)
-        df = data[['Issue key', 'Comments', 'Component']].copy()
-
-        df.to_csv(output_csv_path, index=False)
-
         sheet = wb["Build Analysis"]
         summary_sheet = wb["Summary"]
+        risk_register_sheet = wb["Risk Register"]
 
+        # Read CSV
+        data = pd.read_csv(file_path)
+        dict_data = data.set_index('Issue key').to_dict('index')
+        jira_id = list(dict_data.keys())
+
+        security_comment, manual_testing, jira_type = [], [], []
+        why_manual_testing_not_required = []
+        securityJiraFilter = ['security', 'appsecurity', 'ram', 'dan', 'kan', 'van']
+
+        for key in dict_data:
+            flag_jira_type, flag_security_comment, flag_manual_testing = False, False, False
+            for key1 in dict_data[key]:
+                comment = str(dict_data[key][key1]).lower()
+
+                if not flag_security_comment and patch_id in comment and 'security validation' in comment:
+                    security_comment.append(comment.split('comments:')[1][:-3])
+                    flag_security_comment = True
+
+                    if 'manual testing:' in comment:
+                        manualTesting = comment.split('manual testing:')[1][:6]
+                        if not flag_manual_testing and 'done' in manualTesting:
+                            manual_testing.append('Done')
+                            flag_manual_testing = True
+
+                if not flag_jira_type and ('Component' in str(key1) or 'QA-TeamLead' in str(key1)):
+                    if comment.lower() in securityJiraFilter:
+                        flag_jira_type = True
+                        jira_type.append('Security Jira')
+
+            if not flag_jira_type:
+                jira_type.append('Functional Jira')
+            if not flag_security_comment:
+                security_comment.append('NA')
+            if not flag_manual_testing:
+                manual_testing.append('NA')
+
+            if manual_testing[-1] == 'Done':
+                why_manual_testing_not_required.append(' ')
+            elif jira_type[-1] == 'Functional Jira':
+                why_manual_testing_not_required.append(
+                    'It is a functional jira. Code review is done to check for security vulnerabilities'
+                )
+            elif jira_type[-1] == 'Security Jira':
+                why_manual_testing_not_required.append(
+                    'This security issue was observed during Code Review. Code review was done to find the security issue'
+                )
+            else:
+                why_manual_testing_not_required.append('NA')
+
+        df = pd.DataFrame({
+            'Jira ID': jira_id,
+            'Security Comment': security_comment,
+            'Jira Type': jira_type,
+            'Manual Testing': manual_testing,
+            'Why manual testing is not required?': why_manual_testing_not_required
+        })
+
+        # Save output CSV
+        df.to_csv(output_csv_path, index=False)
+
+        # Write Build Analysis tab
         sheet["A3"] = build_name
         sheet["B3"] = report_date
         sheet["E3"] = total_time
-        sheet["D3"] = os.getlogin().title()
 
+        # Format D3: Convert username to Title Case
+        username = os.getlogin().replace('.', ' ')
+        sheet["D3"] = username.title()
+
+        # Copy Build Name to Summary tab (B1)
         summary_sheet["B1"] = build_name
 
+        # Count Functional and Security Jira
+        functional_count = 0
+        security_count = 0
+        start_row = 3
+
+        for i, (jira_id, jira_type, manual_testing, security_comment, why_manual_testing) in enumerate(
+                zip(df["Jira ID"], df["Jira Type"], df["Manual Testing"], df["Security Comment"],
+                    df["Why manual testing is not required?"]), start=start_row):
+
+            sheet[f"F{i}"] = jira_id
+            sheet[f"G{i}"] = jira_type
+            sheet[f"I{i}"] = manual_testing
+            sheet[f"J{i}"] = security_comment
+            sheet[f"K{i}"] = why_manual_testing
+
+            if jira_type == "Functional Jira":
+                functional_count += 1
+            elif jira_type == "Security Jira":
+                security_count += 1
+
+        total_filled = sum(1 for row in range(3, sheet.max_row + 1) if sheet[f"F{row}"].value)
+        sheet["C3"] = total_filled  
+
+        # Write Functional Jira count (C3) and Security Jira count (C4) in Summary tab
+        summary_sheet["C3"] = functional_count
+        summary_sheet["C4"] = security_count
+
+        # Write Authentication & Authorization values to Risk Register tab
+        risk_register_sheet["C3"] = auth_value
+        risk_register_sheet["C4"] = authz_value
+
+        # Save Excel report
         wb.save(output_xlsx_path)
 
         status_label.config(text="Process Completed Successfully!", foreground="green")
@@ -148,15 +161,10 @@ def browse_csv():
 # Tkinter GUI
 root = Tk()
 root.title("JIRA Report Processor")
-root.geometry("550x320")
+root.geometry("550x400")
 root.resizable(False, False)
 
-# Menu Bar
-menu_bar = Menu(root)
-root.config(menu=menu_bar)
-menu_bar.add_command(label="Configuration", command=open_config)
-
-Label(root, text="Patch ID:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+Label(root, text="APU-ID (Patch ID):").grid(row=0, column=0, padx=10, pady=5, sticky="w")
 entry_patch_id = Entry(root, width=40)
 entry_patch_id.grid(row=0, column=1, padx=10, pady=5)
 
@@ -168,17 +176,15 @@ Label(root, text="Report Date:").grid(row=2, column=0, padx=10, pady=5, sticky="
 date_picker = DateEntry(root, width=12, background="darkblue", foreground="white", date_pattern="yyyy-mm-dd")
 date_picker.grid(row=2, column=1, padx=10, pady=5)
 
-Label(root, text="Total Time Taken:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
-entry_total_time = Entry(root, width=40)
-entry_total_time.grid(row=3, column=1, padx=10, pady=5)
+Label(root, text="Authentication:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+auth_dropdown = ttk.Combobox(root, values=["NA", "Done", "Not Done"], state="readonly", width=37)
+auth_dropdown.grid(row=3, column=1, padx=10, pady=5)
 
-Label(root, text="Select CSV File:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
-entry_csv = Entry(root, width=30)
-entry_csv.grid(row=4, column=1, padx=10, pady=5)
-Button(root, text="Browse", command=browse_csv).grid(row=4, column=2)
+Label(root, text="Authorization:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+authz_dropdown = ttk.Combobox(root, values=["NA", "Done", "Not Done"], state="readonly", width=37)
+authz_dropdown.grid(row=4, column=1, padx=10, pady=5)
 
 Button(root, text="Process Data", command=process_data).grid(row=5, column=1, pady=20)
-
 status_label = Label(root, text="", font=("Arial", 10, "bold"))
 status_label.grid(row=6, column=1, pady=5)
 
