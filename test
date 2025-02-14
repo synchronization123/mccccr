@@ -13,6 +13,7 @@ def process_data():
     file_path = entry_csv.get().strip()
     template_path = "C://user//template//report.xlsx"
     output_csv_path = "C://user/patch/output.csv"
+    output_xlsx_path = f"C://user/patch/{build_name}.xlsx"
 
     if not patch_id or not build_name or not total_time or not file_path:
         messagebox.showerror("Error", "Please fill in all fields!")
@@ -27,7 +28,9 @@ def process_data():
             messagebox.showerror("Error", f"Template file not found: {template_path}")
             return
 
-        final_report_path = os.path.join(os.getcwd(), f"{build_name}.xlsx")
+        # Ensure the output directory exists
+        os.makedirs(os.path.dirname(output_csv_path), exist_ok=True)
+
         wb = load_workbook(template_path)
 
         # Read CSV
@@ -87,9 +90,6 @@ def process_data():
             'Why manual testing is not required?': why_manual_testing_not_required
         })
 
-        # Ensure output directory exists
-        os.makedirs(os.path.dirname(output_csv_path), exist_ok=True)
-        
         # Save output CSV in hardcoded path
         df.to_csv(output_csv_path, index=False)
 
@@ -141,11 +141,11 @@ def process_data():
         summary_sheet["C3"] = functional_count
         summary_sheet["C4"] = security_count
 
-        # Save workbook with Build Name
-        wb.save(final_report_path)
+        # Save workbook with Build Name in hardcoded path
+        wb.save(output_xlsx_path)
 
         status_label.config(text="Process Completed Successfully!", foreground="green")
-        messagebox.showinfo("Success", f"Report saved as: {final_report_path}")
+        messagebox.showinfo("Success", f"Report saved as: {output_xlsx_path}")
 
     except Exception as e:
         status_label.config(text="Error occurred!", foreground="red")
