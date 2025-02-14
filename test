@@ -1,186 +1,175 @@
-import sys
 import os
 import pandas as pd
 from openpyxl import load_workbook
-from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit,
-    QPushButton, QFileDialog, QTextEdit, QMessageBox, QProgressBar
-)
-from PyQt6.QtGui import QFont
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from openpyxl.utils import get_column_letter
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
 
+# Function to process data
+def process_data():
+    patch_id = entry_patch_id.get()
+    file_path = entry_csv.get()
+    final_report_path = entry_excel.get()
 
-class ProcessingThread(QThread):
-    progress_signal = pyqtSignal(str)
-    completed_signal = pyqtSignal(bool)
+    if not patch_id or not file_path or not final_report_path:
+        messagebox.showerror("Error", "Please fill in all fields!")
+        return
 
-    def __init__(self, patch_id, file_path, final_report_path):
-        super().__init__()
-        self.patch_id = patch_id
-        self.file_path = file_path
-        self.final_report_path = final_report_path
+    try:
+        # Show processing status
+        status_label.config(text="Processing...", foreground="blue")
+        root.update_idletasks()
 
-    def run(self):
-        try:
-            self.progress_signal.emit("Reading CSV file...")
-            data = pd.read_csv(self.file_path)
+        # Read the CSV dump file
+        data = pd.read_csv(file_path)
+        dict_data = data.set_index('Issue key').to_dict('index')
+        jira_id = list(dict_data.keys())
 
-            dict_data = data.set_index('Issue key').to_dict('index')
-            jira_id = list(dict_data.keys())
-            security_comment, manual_testing, jira_type = [], [], []
-            securityJiraFilter = ['security', 'appsecurity', 'ram', 'dan', 'kan', 'van']
-            why_manual_testing_not_requered = []
+        security_comment, manual_testing, jira_type = [], [], []
+        securityJiraFilter = ['security', 'appsecurity', 'ram', 'dan', 'kan', 'van']
+        why_manual_testing_not_required = []
 
-            for key in dict_data:
-                flag_jira_type, flag_security_comment, flag_manual_testing = False, False, False
+        for key in dict_data:
+            flag_jira_type, flag_security_comment, flag_manual_testing = False, False, False
+            for key1 in dict_data[key]:
+                comment = str(dict_data[key][key1]).lower()
 
-                for key1 in dict_data[key]:
-                    comment = str(dict_data[key][key1]).lower()
-                    if not flag_security_comment and self.patch_id in comment and 'security validation' in comment:
-                        security_comment.append(comment.split('comments:')[1][:-3])
-                        flag_security_comment = True
+                if not flag_security_comment and patch_id in comment and 'security validation' in comment:
+                    security_comment.append(comment.split('comments:')[1][:-3])
+                    flag_security_comment = True
 
-                        if 'manual testing:' in comment:
-                            manualTesting = comment.split('manual testing:')[1][:6]
-                            if not flag_manual_testing and 'done' in manualTesting:
-                                manual_testing.append('Done')
-                                flag_manual_testing = True
+                    if 'manual testing:' in comment:
+                        manualTesting = comment.split('manual testing:')[1][:6]
+                        if not flag_manual_testing and 'done' in manualTesting:
+                            manual_testing.append('Done')
+                            flag_manual_testing = True
 
-                    if not flag_jira_type and ('Component' in str(key1) or 'QA-TeamLead' in str(key1)):
-                        if comment in securityJiraFilter:
-                            flag_jira_type = True
-                            jira_type.append('Security Jira')
+                if not flag_jira_type and ('Component' in str(key1) or 'QA-TeamLead' in str(key1)):
+                    if comment.lower() in securityJiraFilter:
+                        flag_jira_type = True
+                        jira_type.append('Security Jira')
 
-                if not flag_jira_type:
-                    jira_type.append('Functional Jira')
+            if not flag_jira_type:
+                jira_type.append('Functional Jira')
+            if not flag_security_comment:
+                security_comment.append('NA')
+            if not flag_manual_testing:
+                manual_testing.append('NA')
 
-                if not flag_security_comment:
-                    security_comment.append('NA')
-
-                if not flag_manual_testing:
-                    manual_testing.append('NA')
-
-                why_manual_testing_not_requered.append(
-                    ' ' if manual_testing[-1] == 'Done' else
-                    'It is a functional jira. Code review is done to check for security vulnerabilities' if jira_type[-1] == 'Functional Jira' else
-                    'This security issue was observed during Code Review. Code review was done to find the security issue' if jira_type[-1] == 'Security Jira' else 'NA'
+            if manual_testing[-1] == 'Done':
+                why_manual_testing_not_required.append(' ')
+            elif jira_type[-1] == 'Functional Jira':
+                why_manual_testing_not_required.append(
+                    'It is a functional jira. Code review is done to check for security vulnerabilities'
                 )
+            elif jira_type[-1] == 'Security Jira':
+                why_manual_testing_not_required.append(
+                    'This security issue was observed during Code Review. Code review was done to find the security issue'
+                )
+            else:
+                why_manual_testing_not_required.append('NA')
 
-            final_dict = {
-                'Jira ID': jira_id,
-                'Security Comment': security_comment,
-                'Jira Type': jira_type,
-                'Manual Testing': manual_testing,
-                'Why manual testing is not required?': why_manual_testing_not_requered
-            }
+        df = pd.DataFrame({
+            'Jira ID': jira_id,
+            'Security Comment': security_comment,
+            'Jira Type': jira_type,
+            'Manual Testing': manual_testing,
+            'Why manual testing is not required?': why_manual_testing_not_required
+        })
 
-            df = pd.DataFrame(final_dict)
-            df.to_csv('output.csv', index=False)
+        df.to_csv('output.csv', index=False)
 
-            self.progress_signal.emit("Updating Excel file...")
-            wb = load_workbook(self.final_report_path)
-            sheet = wb["Build Analysis"]
+        # Load FinalReport workbook
+        wb = load_workbook(final_report_path)
+        sheet = wb["Build Analysis"]
 
-            for i, jira_id in enumerate(df["Jira ID"], start=3):
-                sheet.cell(row=i, column=3, value=jira_id)  # Assuming "Issue Key" is in column C
+        headers = {cell.value: cell.column for cell in sheet[1] if cell.value}
 
-            for i, jira_type in enumerate(df["Jira Type"], start=3):
-                sheet["G" + str(i)] = jira_type
+        def get_top_left_of_merged(sheet, row, col):
+            for merged_range in sheet.merged_cells.ranges:
+                if (row, col) in merged_range.cells:
+                    return merged_range.min_row, merged_range.min_col
+            return row, col
 
-            for i, manual_testing in enumerate(df["Manual Testing"], start=3):
-                sheet["I" + str(i)] = manual_testing
+        for i, jira_id in enumerate(df["Jira ID"], start=3):
+            if headers.get("Issue Key (JIRA ID)"):
+                row, col = get_top_left_of_merged(sheet, i, headers["Issue Key (JIRA ID)"])
+                if row > 1:
+                    sheet.cell(row=row, column=col, value=jira_id)
 
-            for i, security_comment in enumerate(df["Security Comment"], start=3):
-                sheet["J" + str(i)] = security_comment
+        for i, jira_type in enumerate(df["Jira Type"], start=3):
+            sheet["G" + str(i)] = jira_type
 
-            for i, why_manual_testing_not_requered in enumerate(df["Why manual testing is not required?"], start=3):
-                sheet["K" + str(i)] = why_manual_testing_not_requered
+        for i, manual_testing in enumerate(df["Manual Testing"], start=3):
+            sheet["I" + str(i)] = manual_testing
 
-            sheet["C3"] = len(jira_id)
-            sheet["D3"] = os.getlogin().replace('.', ' ')
-            wb.save(self.final_report_path)
+        for i, security_comment in enumerate(df["Security Comment"], start=3):
+            sheet["J" + str(i)] = security_comment
 
-            self.progress_signal.emit("Processing completed successfully.")
-            self.completed_signal.emit(True)
+        for i, why_manual_testing_not_required in enumerate(df["Why manual testing is not required?"], start=3):
+            sheet["K" + str(i)] = why_manual_testing_not_required
 
-        except Exception as e:
-            self.progress_signal.emit(f"Error: {str(e)}")
-            self.completed_signal.emit(False)
+        sheet["C3"] = len(jira_id)
+        sheet["D3"] = os.getlogin().replace('.', ' ')
+
+        wb.save(final_report_path)
+
+        # Success message
+        status_label.config(text="Process Completed Successfully!", foreground="green")
+        messagebox.showinfo("Success", "Data successfully updated in FinalReport.xlsx.")
+
+    except Exception as e:
+        status_label.config(text="Error occurred!", foreground="red")
+        messagebox.showerror("Error", str(e))
 
 
-class ModernGUI(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.initUI()
+# Function to browse CSV file
+def browse_csv():
+    filename = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv")])
+    if filename:
+        entry_csv.delete(0, tk.END)
+        entry_csv.insert(0, filename)
 
-    def initUI(self):
-        self.setWindowTitle("Modern Python GUI")
-        self.setGeometry(100, 100, 500, 500)
-        self.setStyleSheet("background-color: #2C3E50; color: white; border-radius: 10px;")
 
-        layout = QVBoxLayout()
+# Function to browse Excel file
+def browse_excel():
+    filename = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx")])
+    if filename:
+        entry_excel.delete(0, tk.END)
+        entry_excel.insert(0, filename)
 
-        title = QLabel("Excel Data Processor")
-        title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.patch_id_input = QLineEdit()
-        self.patch_id_input.setPlaceholderText("Enter APU-ID")
-        self.patch_id_input.setStyleSheet("background-color: #34495E; color: white; padding: 8px; border-radius: 5px;")
+# Tkinter GUI
+root = tk.Tk()
+root.title("JIRA Report Processor")
+root.geometry("500x500")
+root.resizable(False, False)
+root.configure(bg="#f0f0f0")
 
-        self.file_btn = QPushButton("Select CSV Dump")
-        self.file_btn.clicked.connect(self.select_csv)
+# Styling
+style = ttk.Style()
+style.configure("TButton", font=("Arial", 10), padding=6)
+style.configure("TLabel", font=("Arial", 10))
+style.configure("TEntry", font=("Arial", 10), padding=6)
 
-        self.excel_btn = QPushButton("Select Final Report Excel")
-        self.excel_btn.clicked.connect(self.select_excel)
+# GUI Elements
+ttk.Label(root, text="Enter APU-ID (Patch ID):").pack(pady=5)
+entry_patch_id = ttk.Entry(root, width=50)
+entry_patch_id.pack(pady=5)
 
-        self.start_btn = QPushButton("Start Processing")
-        self.start_btn.clicked.connect(self.process_data)
-        self.start_btn.setStyleSheet("background-color: #1ABC9C; color: white; padding: 10px; border-radius: 5px;")
+ttk.Label(root, text="Select CSV Dump File:").pack(pady=5)
+entry_csv = ttk.Entry(root, width=40)
+entry_csv.pack(side=tk.LEFT, padx=10, pady=5)
+ttk.Button(root, text="Browse", command=browse_csv).pack(side=tk.LEFT, pady=5)
 
-        self.status_text = QTextEdit()
-        self.status_text.setReadOnly(True)
-        self.status_text.setStyleSheet("background-color: #1E272E; color: white; border-radius: 5px;")
+ttk.Label(root, text="Select FinalReport Excel File:").pack(pady=5)
+entry_excel = ttk.Entry(root, width=40)
+entry_excel.pack(side=tk.LEFT, padx=10, pady=5)
+ttk.Button(root, text="Browse", command=browse_excel).pack(side=tk.LEFT, pady=5)
 
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setStyleSheet("QProgressBar { border: 2px solid white; border-radius: 5px; }")
+ttk.Button(root, text="Process Data", command=process_data, style="TButton").pack(pady=20)
 
-        layout.addWidget(title)
-        layout.addWidget(self.patch_id_input)
-        layout.addWidget(self.file_btn)
-        layout.addWidget(self.excel_btn)
-        layout.addWidget(self.start_btn)
-        layout.addWidget(self.progress_bar)
-        layout.addWidget(self.status_text)
+status_label = ttk.Label(root, text="", font=("Arial", 10, "bold"))
+status_label.pack(pady=5)
 
-        self.setLayout(layout)
-
-    def select_csv(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select CSV File", "", "CSV Files (*.csv)")
-        if file_path:
-            self.file_btn.setText(file_path)
-
-    def select_excel(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select Excel File", "", "Excel Files (*.xlsx)")
-        if file_path:
-            self.excel_btn.setText(file_path)
-
-    def process_data(self):
-        patch_id = self.patch_id_input.text()
-        csv_path = self.file_btn.text()
-        excel_path = self.excel_btn.text()
-
-        if not patch_id or "Select" in csv_path or "Select" in excel_path:
-            QMessageBox.warning(self, "Warning", "Please provide all inputs!")
-            return
-
-        self.thread = ProcessingThread(patch_id, csv_path, excel_path)
-        self.thread.progress_signal.connect(self.status_text.append)
-        self.thread.completed_signal.connect(lambda success: QMessageBox.information(self, "Done", "Processing Completed!") if success else None)
-        self.thread.start()
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    gui = ModernGUI()
-    gui.show()
-    sys.exit(app.exec())
+root.mainloop()
