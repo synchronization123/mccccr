@@ -1,155 +1,200 @@
 import os
-import pandas as aD2
-from openpyxl import load_workbook as Lw8
-from tkinter import filedialog as Fd9, messagebox as Mb7, ttk as Tk3, Tk as Tk1, Label as Lb3, Entry as Et5, Button as Bt6
-from tkcalendar import DateEntry as Dt1
+import pandas as pd
+from openpyxl import load_workbook
+from tkinter import filedialog, messagebox, ttk, Tk, Label, Entry, Button
+from tkcalendar import DateEntry
 
-def pr0c355():
-    x1 = n2.get().strip()
-    x2 = n3.get().strip()
-    x3 = n4.get().strip()
-    x4 = d1.get_date().strftime("%Y-%m-%d")
-    x5 = n5.get().strip()
-    x6 = "C://user//template//report.xlsx"
+# Function to process data
+def process_data():
+    patch_id = entry_patch_id.get().strip()
+    build_name = entry_build_name.get().strip()
+    total_time = entry_total_time.get().strip()
+    report_date = date_picker.get_date().strftime("%Y-%m-%d")
+    file_path = entry_csv.get().strip()
+    template_path = "C://user//template//report.xlsx"
 
-    if not x1 or not x2 or not x3 or not x5:
-        Mb7.showerror("Err0r", "F1ll 4ll f13ld5!")
+    if not patch_id or not build_name or not total_time or not file_path:
+        messagebox.showerror("Error", "Please fill in all fields!")
         return
 
     try:
-        s1.config(text="Pr0c3551ng...", foreground="blue")
-        rt.update_idletasks()
+        status_label.config(text="Processing...", foreground="blue")
+        root.update_idletasks()
 
-        if not os.path.exists(x6):
-            Mb7.showerror("Err0r", f"F1l3 n0t f0und: {x6}")
+        # Load report template
+        if not os.path.exists(template_path):
+            messagebox.showerror("Error", f"Template file not found: {template_path}")
             return
 
-        x7 = f"{x2}.xlsx"
-        wb = Lw8(x6)
-        d0 = aD2.read_csv(x5)
-        d1 = d0.set_index('Issue key').to_dict('index')
-        l1 = list(d1.keys())
+        final_report_path = f"{build_name}.xlsx"
+        wb = load_workbook(template_path)
 
-        s_c, m_t, j_t = [], [], []
-        w_m_t = []
-        f_t, s_t = 0, 0
+        # Read CSV
+        data = pd.read_csv(file_path)
+        dict_data = data.set_index('Issue key').to_dict('index')
+        jira_id = list(dict_data.keys())
 
-        f_l = ['security', 'appsecurity', 'ram', 'dan', 'kan', 'van']
+        security_comment, manual_testing, jira_type = [], [], []
+        why_manual_testing_not_required = []
+        securityJiraFilter = ['security', 'appsecurity', 'ram', 'dan', 'kan', 'van']
 
-        for k in d1:
-            f1, f2, f3 = False, False, False
-            for k1 in d1[k]:
-                c = str(d1[k][k1]).lower()
+        for key in dict_data:
+            flag_jira_type, flag_security_comment, flag_manual_testing = False, False, False
+            for key1 in dict_data[key]:
+                comment = str(dict_data[key][key1]).lower()
 
-                if not f2 and x1 in c and 'security validation' in c:
-                    s_c.append(c.split('comments:')[1][:-3])
-                    f2 = True
-                    if 'manual testing:' in c:
-                        mt = c.split('manual testing:')[1][:6]
-                        if not f3 and 'done' in mt:
-                            m_t.append('D0n3')
-                            f3 = True
+                if not flag_security_comment and patch_id in comment and 'security validation' in comment:
+                    security_comment.append(comment.split('comments:')[1][:-3])
+                    flag_security_comment = True
 
-                if not f1 and ('Component' in str(k1) or 'QA-TeamLead' in str(k1)):
-                    if c.lower() in f_l:
-                        f1 = True
-                        j_t.append('S3c_J1r4')
+                    if 'manual testing:' in comment:
+                        manualTesting = comment.split('manual testing:')[1][:6]
+                        if not flag_manual_testing and 'done' in manualTesting:
+                            manual_testing.append('Done')
+                            flag_manual_testing = True
 
-            if not f1:
-                j_t.append('Fnc_J1r4')
-            if not f2:
-                s_c.append('N/A')
-            if not f3:
-                m_t.append('N/A')
+                if not flag_jira_type and ('Component' in str(key1) or 'QA-TeamLead' in str(key1)):
+                    if comment.lower() in securityJiraFilter:
+                        flag_jira_type = True
+                        jira_type.append('Security Jira')
 
-            w_m_t.append(' ' if m_t[-1] == 'D0n3' else 'Functional' if j_t[-1] == 'Fnc_J1r4' else 'Security')
+            if not flag_jira_type:
+                jira_type.append('Functional Jira')
+            if not flag_security_comment:
+                security_comment.append('NA')
+            if not flag_manual_testing:
+                manual_testing.append('NA')
 
-        df = aD2.DataFrame({'J1R4': l1, 'S3c': s_c, 'J_Typ3': j_t, 'M_T': m_t, 'W_M_T': w_m_t})
+            if manual_testing[-1] == 'Done':
+                why_manual_testing_not_required.append(' ')
+            elif jira_type[-1] == 'Functional Jira':
+                why_manual_testing_not_required.append(
+                    'It is a functional jira. Code review is done to check for security vulnerabilities'
+                )
+            elif jira_type[-1] == 'Security Jira':
+                why_manual_testing_not_required.append(
+                    'This security issue was observed during Code Review. Code review was done to find the security issue'
+                )
+            else:
+                why_manual_testing_not_required.append('NA')
 
-        f_p = os.path.join(os.getcwd(), "0utput.csv")
+        df = pd.DataFrame({
+            'Jira ID': jira_id,
+            'Security Comment': security_comment,
+            'Jira Type': jira_type,
+            'Manual Testing': manual_testing,
+            'Why manual testing is not required?': why_manual_testing_not_required
+        })
 
-        if os.path.exists(f_p):
-            os.remove(f_p)
+        output_csv_path = os.path.join(os.getcwd(), "output.csv")
 
-        with open(f_p, "w+", newline='', encoding="utf-8") as f:
+        # FIX: Remove old file if it exists to avoid permission issues
+        if os.path.exists(output_csv_path):
+            os.remove(output_csv_path)
+
+        # FIX: Write file with correct permissions
+        with open(output_csv_path, "w+", newline='', encoding="utf-8") as f:
             df.to_csv(f, index=False)
 
-        os.chmod(f_p, 0o777)
+        # Ensure full permissions (Windows & Linux)
+        os.chmod(output_csv_path, 0o777)
 
-        sh = wb["Build Analysis"]
-        sm_sh = wb["Summary"]
+        sheet = wb["Build Analysis"]
+        summary_sheet = wb["Summary"]
 
-        sh["A3"] = x2
-        sh["B3"] = x4
-        sh["E3"] = x3
+        # Write Build Name (A3), Date (B3), and Total Time Taken (E3)
+        sheet["A3"] = build_name
+        sheet["B3"] = report_date
+        sheet["E3"] = total_time
 
-        u_n = os.getlogin().replace('.', ' ')
-        sh["D3"] = u_n.title()
-        sm_sh["B1"] = x2
+        # Format D3: Convert to Title Case
+        username = os.getlogin().replace('.', ' ')
+        sheet["D3"] = username.title()
 
-        sr = 3
-        while sh[f"F{sr}"].value:
-            sr += 1
+        # Also copy Build Name to Summary sheet (B1)
+        summary_sheet["B1"] = build_name
 
-        for i, (a, b, c, d, e) in enumerate(zip(df["J1R4"], df["J_Typ3"], df["M_T"], df["S3c"], df["W_M_T"]), start=sr):
-            sh[f"F{i}"] = a
-            sh[f"G{i}"] = b
-            sh[f"I{i}"] = c
-            sh[f"J{i}"] = d
-            sh[f"K{i}"] = e
-            if b == "Fnc_J1r4":
-                f_t += 1
-            elif b == "S3c_J1r4":
-                s_t += 1
+        # Find the first empty row in column F (starting from F3)
+        start_row = 3
+        while sheet[f"F{start_row}"].value:
+            start_row += 1
 
-        t_f = sum(1 for row in range(3, sh.max_row + 1) if sh[f"F{row}"].value)
-        sh["C3"] = t_f
+        # Track counts for Functional & Security Jira
+        functional_count = 0
+        security_count = 0
 
-        sm_sh["C3"] = f_t
-        sm_sh["C4"] = s_t
+        # Write values into respective columns
+        for i, (jira_id, jira_type, manual_testing, security_comment, why_manual_testing) in enumerate(
+                zip(df["Jira ID"], df["Jira Type"], df["Manual Testing"], df["Security Comment"],
+                    df["Why manual testing is not required?"]), start=start_row):
 
-        wb.save(x7)
-        s1.config(text="C0mpl3t3d!", foreground="green")
-        Mb7.showinfo("Succ3ss", f"S4v3d 45: {x7}")
+            sheet[f"F{i}"] = jira_id
+            sheet[f"G{i}"] = jira_type
+            sheet[f"I{i}"] = manual_testing
+            sheet[f"J{i}"] = security_comment
+            sheet[f"K{i}"] = why_manual_testing
+
+            if jira_type == "Functional Jira":
+                functional_count += 1
+            elif jira_type == "Security Jira":
+                security_count += 1
+
+        # Count non-empty cells in column F starting from F3
+        total_filled = sum(1 for row in range(3, sheet.max_row + 1) if sheet[f"F{row}"].value)
+        sheet["C3"] = total_filled  
+
+        # Write Functional Jira count (C3) and Security Jira count (C4) in Summary tab
+        summary_sheet["C3"] = functional_count
+        summary_sheet["C4"] = security_count
+
+        # Save workbook with Build Name
+        wb.save(final_report_path)
+
+        status_label.config(text="Process Completed Successfully!", foreground="green")
+        messagebox.showinfo("Success", f"Report saved as: {final_report_path}")
 
     except Exception as e:
-        s1.config(text="Err0r!", foreground="red")
-        Mb7.showerror("Err0r", str(e))
+        status_label.config(text="Error occurred!", foreground="red")
+        messagebox.showerror("Error", str(e))
 
-def br0ws3():
-    f = Fd9.askopenfilename(filetypes=[("CSV", "*.csv")])
-    if f:
-        n5.delete(0, "end")
-        n5.insert(0, f)
+# Function to browse CSV file
+def browse_csv():
+    filename = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv")])
+    if filename:
+        entry_csv.delete(0, "end")
+        entry_csv.insert(0, filename)
 
-rt = Tk1()
-rt.title("D4T4 Pr0C355")
-rt.geometry("550x320")
-rt.resizable(False, False)
+# Tkinter GUI
+root = Tk()
+root.title("JIRA Report Processor")
+root.geometry("550x320")
+root.resizable(False, False)
 
-Lb3(rt, text="P-ID:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-n2 = Et5(rt, width=40)
-n2.grid(row=0, column=1, padx=10, pady=5)
+# Layout using Grid
+Label(root, text="APU-ID (Patch ID):").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+entry_patch_id = Entry(root, width=40)
+entry_patch_id.grid(row=0, column=1, padx=10, pady=5)
 
-Lb3(rt, text="B_N4M3:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
-n3 = Et5(rt, width=40)
-n3.grid(row=1, column=1, padx=10, pady=5)
+Label(root, text="Build Name:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+entry_build_name = Entry(root, width=40)
+entry_build_name.grid(row=1, column=1, padx=10, pady=5)
 
-Lb3(rt, text="D4T3:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
-d1 = Dt1(rt, width=12, background="darkblue", foreground="white", date_pattern="yyyy-mm-dd")
-d1.grid(row=2, column=1, padx=10, pady=5)
+Label(root, text="Report Date:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+date_picker = DateEntry(root, width=12, background="darkblue", foreground="white", date_pattern="yyyy-mm-dd")
+date_picker.grid(row=2, column=1, padx=10, pady=5)
 
-Lb3(rt, text="T_T4K3N:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
-n4 = Et5(rt, width=40)
-n4.grid(row=3, column=1, padx=10, pady=5)
+Label(root, text="Total Time Taken:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+entry_total_time = Entry(root, width=40)
+entry_total_time.grid(row=3, column=1, padx=10, pady=5)
 
-Lb3(rt, text="CSV:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
-n5 = Et5(rt, width=30)
-n5.grid(row=4, column=1, padx=10, pady=5)
-Bt6(rt, text="Br0w53", command=br0ws3).grid(row=4, column=2)
+Label(root, text="Select CSV File:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+entry_csv = Entry(root, width=30)
+entry_csv.grid(row=4, column=1, padx=10, pady=5)
+Button(root, text="Browse", command=browse_csv).grid(row=4, column=2)
 
-Bt6(rt, text="Pr0c355", command=pr0c355).grid(row=5, column=1, pady=20)
-s1 = Lb3(rt, text="", font=("Arial", 10, "bold"))
-s1.grid(row=6, column=1, pady=5)
+Button(root, text="Process Data", command=process_data).grid(row=5, column=1, pady=20)
 
-rt.mainloop()
+status_label = Label(root, text="", font=("Arial", 10, "bold"))
+status_label.grid(row=6, column=1, pady=5)
+
+root.mainloop()
