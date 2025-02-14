@@ -1,32 +1,8 @@
 import os
-import json
 import pandas as pd
 from openpyxl import load_workbook
-from tkinter import filedialog, messagebox, ttk, Tk, Label, Entry, Button, Menu
+from tkinter import filedialog, messagebox, ttk, Tk, Label, Entry, Button
 from tkcalendar import DateEntry
-
-# JSON file to store template path
-CONFIG_FILE = "template.json"
-
-# Function to save template path in JSON
-def save_template_path(template_path):
-    with open(CONFIG_FILE, "w") as file:
-        json.dump({"template_path": template_path}, file)
-
-# Function to load template path from JSON
-def load_template_path():
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r") as file:
-            data = json.load(file)
-            return data.get("template_path", "")
-    return ""
-
-# Function to browse and configure template path
-def configure_template():
-    template_path = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx")])
-    if template_path:
-        save_template_path(template_path)
-        messagebox.showinfo("Success", f"Template path saved:\n{template_path}")
 
 # Function to process data
 def process_data():
@@ -35,11 +11,7 @@ def process_data():
     total_time = entry_total_time.get().strip()
     report_date = date_picker.get_date().strftime("%Y-%m-%d")
     file_path = entry_csv.get().strip()
-    
-    template_path = load_template_path()
-    if not template_path or not os.path.exists(template_path):
-        messagebox.showerror("Error", "Template file not found! Please configure the template.")
-        return
+    template_path = "C://user//template//report.xlsx"
 
     if not patch_id or not build_name or not total_time or not file_path:
         messagebox.showerror("Error", "Please fill in all fields!")
@@ -49,12 +21,12 @@ def process_data():
         status_label.config(text="Processing...", foreground="blue")
         root.update_idletasks()
 
+        # Load report template
+        if not os.path.exists(template_path):
+            messagebox.showerror("Error", f"Template file not found: {template_path}")
+            return
+
         final_report_path = f"{build_name}.xlsx"
-
-        # Remove file if it exists to avoid permission issues
-        if os.path.exists(final_report_path):
-            os.remove(final_report_path)
-
         wb = load_workbook(template_path)
 
         # Read CSV
@@ -116,30 +88,33 @@ def process_data():
 
         output_csv_path = os.path.join(os.getcwd(), "output.csv")
 
-        # Remove old CSV file if it exists
+        # FIX: Remove old file if it exists to avoid permission issues
         if os.path.exists(output_csv_path):
             os.remove(output_csv_path)
 
-        # Write CSV with full permissions
-        df.to_csv(output_csv_path, index=False)
+        # FIX: Write file with correct permissions
+        with open(output_csv_path, "w+", newline='', encoding="utf-8") as f:
+            df.to_csv(f, index=False)
+
+        # Ensure full permissions (Windows & Linux)
         os.chmod(output_csv_path, 0o777)
 
         sheet = wb["Build Analysis"]
         summary_sheet = wb["Summary"]
 
-        # Write Build Name, Date, and Total Time
+        # Write Build Name (A3), Date (B3), and Total Time Taken (E3)
         sheet["A3"] = build_name
         sheet["B3"] = report_date
         sheet["E3"] = total_time
 
-        # Convert Username to Title Case
+        # Format D3: Convert to Title Case
         username = os.getlogin().replace('.', ' ')
         sheet["D3"] = username.title()
 
         # Also copy Build Name to Summary sheet (B1)
         summary_sheet["B1"] = build_name
 
-        # Find first empty row in column F (starting from F3)
+        # Find the first empty row in column F (starting from F3)
         start_row = 3
         while sheet[f"F{start_row}"].value:
             start_row += 1
@@ -172,12 +147,8 @@ def process_data():
         summary_sheet["C3"] = functional_count
         summary_sheet["C4"] = security_count
 
-        # Close workbook before saving
-        wb.close()
-
-        # Save with full permissions
+        # Save workbook with Build Name
         wb.save(final_report_path)
-        os.chmod(final_report_path, 0o777)
 
         status_label.config(text="Process Completed Successfully!", foreground="green")
         messagebox.showinfo("Success", f"Report saved as: {final_report_path}")
@@ -196,13 +167,10 @@ def browse_csv():
 # Tkinter GUI
 root = Tk()
 root.title("JIRA Report Processor")
-root.geometry("550x350")
+root.geometry("550x320")
 root.resizable(False, False)
 
-menu_bar = Menu(root)
-root.config(menu=menu_bar)
-menu_bar.add_command(label="Configure Template", command=configure_template)
-
+# Layout using Grid
 Label(root, text="APU-ID (Patch ID):").grid(row=0, column=0, padx=10, pady=5, sticky="w")
 entry_patch_id = Entry(root, width=40)
 entry_patch_id.grid(row=0, column=1, padx=10, pady=5)
@@ -215,8 +183,18 @@ Label(root, text="Report Date:").grid(row=2, column=0, padx=10, pady=5, sticky="
 date_picker = DateEntry(root, width=12, background="darkblue", foreground="white", date_pattern="yyyy-mm-dd")
 date_picker.grid(row=2, column=1, padx=10, pady=5)
 
-Button(root, text="Process Data", command=process_data).grid(row=3, column=1, pady=20)
+Label(root, text="Total Time Taken:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+entry_total_time = Entry(root, width=40)
+entry_total_time.grid(row=3, column=1, padx=10, pady=5)
+
+Label(root, text="Select CSV File:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+entry_csv = Entry(root, width=30)
+entry_csv.grid(row=4, column=1, padx=10, pady=5)
+Button(root, text="Browse", command=browse_csv).grid(row=4, column=2)
+
+Button(root, text="Process Data", command=process_data).grid(row=5, column=1, pady=20)
+
 status_label = Label(root, text="", font=("Arial", 10, "bold"))
-status_label.grid(row=4, column=1, pady=5)
+status_label.grid(row=6, column=1, pady=5)
 
 root.mainloop()
