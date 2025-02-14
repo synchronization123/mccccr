@@ -34,18 +34,19 @@ def process_data():
         # Ensure the output directory exists
         os.makedirs(os.path.dirname(output_csv_path), exist_ok=True)
 
-        wb = load_workbook(template_path)
-
         # Read CSV
         data = pd.read_csv(file_path)
-        dict_data = data.set_index('Issue key').to_dict('index')
-        jira_id = list(dict_data.keys())
-
-        # Fetch Build Name to Summary tab (B1)
+        
+        # Generate and save output CSV
+        data.to_csv(output_csv_path, index=False)
+        
+        # Open Excel report template
+        wb = load_workbook(template_path)
         sheet = wb["Build Analysis"]
         summary_sheet = wb["Summary"]
         risk_register_sheet = wb["Risk Register"]
 
+        # Fill required fields
         sheet["A3"] = build_name
         sheet["B3"] = report_date
         sheet["E3"] = total_time
@@ -60,7 +61,20 @@ def process_data():
         risk_register_sheet["C3"] = auth_value
         risk_register_sheet["C4"] = authz_value
 
-        # Save workbook with Build Name
+        # Copy data from CSV to Report
+        start_row = 3  # Data starts from row 3
+        for idx, row in data.iterrows():
+            sheet[f"F{start_row}"] = row["Functional Jira"]
+            sheet[f"G{start_row}"] = row["Security Jira"]
+            start_row += 1
+
+        # Count values for Summary tab
+        functional_count = data["Functional Jira"].count()
+        security_count = data["Security Jira"].count()
+        summary_sheet["C3"] = functional_count
+        summary_sheet["C4"] = security_count
+
+        # Save report with Build Name
         wb.save(output_xlsx_path)
 
         status_label.config(text="Process Completed Successfully!", foreground="green")
