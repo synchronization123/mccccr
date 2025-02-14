@@ -7,19 +7,27 @@ from tkcalendar import DateEntry
 # Function to process data
 def process_data():
     patch_id = entry_patch_id.get()
-    build_name = entry_build_name.get()
-    total_time = entry_total_time.get()
+    build_name = entry_build_name.get().strip()
+    total_time = entry_total_time.get().strip()
     report_date = date_picker.get_date().strftime("%Y-%m-%d")
-    file_path = entry_csv.get()
-    final_report_path = entry_excel.get()
+    file_path = entry_csv.get().strip()
+    template_path = "C://user//template//report.xlsx"
 
-    if not patch_id or not build_name or not total_time or not file_path or not final_report_path:
+    if not patch_id or not build_name or not total_time or not file_path:
         messagebox.showerror("Error", "Please fill in all fields!")
         return
 
     try:
         status_label.config(text="Processing...", foreground="blue")
         root.update_idletasks()
+
+        # Load report template
+        if not os.path.exists(template_path):
+            messagebox.showerror("Error", f"Template file not found: {template_path}")
+            return
+
+        final_report_path = f"{build_name}.xlsx"
+        wb = load_workbook(template_path)
 
         # Read CSV
         data = pd.read_csv(file_path)
@@ -80,8 +88,6 @@ def process_data():
 
         df.to_csv('output.csv', index=False)
 
-        # Load FinalReport workbook
-        wb = load_workbook(final_report_path)
         sheet = wb["Build Analysis"]
         summary_sheet = wb["Summary"]
 
@@ -90,10 +96,16 @@ def process_data():
         sheet["B3"] = report_date
         sheet["E3"] = total_time
 
+        # Format D3: Convert to Title Case
+        username = os.getlogin().replace('.', ' ')
+        sheet["D3"] = username.title()
+
+        # Also copy Build Name to Summary sheet (B1)
+        summary_sheet["B1"] = build_name
+
         # Find the first empty row in column F (starting from F3)
         start_row = 3
-        f_column = 'F'
-        while sheet[f"{f_column}{start_row}"].value:
+        while sheet[f"F{start_row}"].value:
             start_row += 1
 
         # Track counts for Functional & Security Jira
@@ -116,22 +128,19 @@ def process_data():
             elif jira_type == "Security Jira":
                 security_count += 1
 
-        # Dynamically count non-empty cells in column F starting from F3
+        # Count non-empty cells in column F starting from F3
         total_filled = sum(1 for row in range(3, sheet.max_row + 1) if sheet[f"F{row}"].value)
-        sheet["C3"] = total_filled  # Update C3 with total filled cells in column F
-
-        # Store username in D3
-        sheet["D3"] = os.getlogin().replace('.', ' ')
+        sheet["C3"] = total_filled  
 
         # Write Functional Jira count (C3) and Security Jira count (C4) in Summary tab
         summary_sheet["C3"] = functional_count
         summary_sheet["C4"] = security_count
 
-        # Save workbook
+        # Save workbook with Build Name
         wb.save(final_report_path)
 
         status_label.config(text="Process Completed Successfully!", foreground="green")
-        messagebox.showinfo("Success", "Data successfully updated in FinalReport.xlsx.")
+        messagebox.showinfo("Success", f"Report saved as: {final_report_path}")
 
     except Exception as e:
         status_label.config(text="Error occurred!", foreground="red")
@@ -144,27 +153,20 @@ def browse_csv():
         entry_csv.delete(0, "end")
         entry_csv.insert(0, filename)
 
-# Function to browse Excel file
-def browse_excel():
-    filename = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx")])
-    if filename:
-        entry_excel.delete(0, "end")
-        entry_excel.insert(0, filename)
-
 # Tkinter GUI
 root = Tk()
 root.title("JIRA Report Processor")
-root.geometry("550x350")
+root.geometry("550x320")
 root.resizable(False, False)
 
 # Layout using Grid
 Label(root, text="APU-ID (Patch ID):").grid(row=0, column=0, padx=10, pady=5, sticky="w")
 entry_patch_id = Entry(root, width=40)
-entry_patch_id.grid(row=0, column=1, padx=10, pady=5, columnspan=2)
+entry_patch_id.grid(row=0, column=1, padx=10, pady=5)
 
 Label(root, text="Build Name:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
 entry_build_name = Entry(root, width=40)
-entry_build_name.grid(row=1, column=1, padx=10, pady=5, columnspan=2)
+entry_build_name.grid(row=1, column=1, padx=10, pady=5)
 
 Label(root, text="Report Date:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
 date_picker = DateEntry(root, width=12, background="darkblue", foreground="white", date_pattern="yyyy-mm-dd")
@@ -172,21 +174,16 @@ date_picker.grid(row=2, column=1, padx=10, pady=5)
 
 Label(root, text="Total Time Taken:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
 entry_total_time = Entry(root, width=40)
-entry_total_time.grid(row=3, column=1, padx=10, pady=5, columnspan=2)
+entry_total_time.grid(row=3, column=1, padx=10, pady=5)
 
 Label(root, text="Select CSV File:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
 entry_csv = Entry(root, width=30)
 entry_csv.grid(row=4, column=1, padx=10, pady=5)
 Button(root, text="Browse", command=browse_csv).grid(row=4, column=2)
 
-Label(root, text="Select Excel File:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
-entry_excel = Entry(root, width=30)
-entry_excel.grid(row=5, column=1, padx=10, pady=5)
-Button(root, text="Browse", command=browse_excel).grid(row=5, column=2)
-
-Button(root, text="Process Data", command=process_data).grid(row=6, column=1, pady=20)
+Button(root, text="Process Data", command=process_data).grid(row=5, column=1, pady=20)
 
 status_label = Label(root, text="", font=("Arial", 10, "bold"))
-status_label.grid(row=7, column=1, pady=5)
+status_label.grid(row=6, column=1, pady=5)
 
 root.mainloop()
